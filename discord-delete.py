@@ -1,20 +1,21 @@
 import time
 import os
-import csv
-import argparse
 import requests
+
+from argparse import ArgumentParser
+from csv import DictReader
 
 # Constants
 API = "https://discordapp.com/api/v6" 
 
-parser = argparse.ArgumentParser()
+parser = ArgumentParser()
 
 action = parser.add_subparsers(
-    dest="action"
+    dest="action",
 )
 
 wipe = action.add_parser(
-    "wipe", 
+    "wipe",
     help="Wipe messages from all channels you have participated in. Requires a data download package."
 )
 
@@ -67,10 +68,10 @@ def wipe_messages(discord, root):
             continue
         
         messages = open("{}/{}/messages.csv".format(path, sub), "r")
-        reader = csv.DictReader(messages)
+        reader = DictReader(messages)
         
         for line in reader:
-            print(discord.delete_message(filename, line["ID"]))
+            print(discord.delete_message(sub, line["ID"]))
 
 def clear_messages(discord):
     # TODO: Delete from guilds too.
@@ -84,14 +85,14 @@ def clear_messages(discord):
             print(discord.delete_message(channel["id"], message["id"]))
 
 class Discord:
-    def __init__(self, email, password):
-        self.token = Discord.__token(email, password)
-
     def __token(email, password):
         return requests.post("{}/auth/login".format(API), json={ 
             "email": email,
             "password": password
         }).json()["token"]
+
+    def __init__(self, email, password):
+        self.token = Discord.__token(email, password)
 
     def __get(self, endpoint):
         res = requests.get(
@@ -102,7 +103,7 @@ class Discord:
         data = res.json()
 
         # If we're being rate limited, wait for a while.
-        if res.status_code is 429:
+        if res.status_code == 429:
             time.sleep(data["retry_after"])
             return self.__get(endpoint)
 
@@ -117,9 +118,9 @@ class Discord:
         data = res.json()
 
         # If we're being rate limited, wait for a while.
-        if res.status_code is 429:
+        if res.status_code == 429:
             time.sleep(data["retry_after"])
-            return self.__get(endpoint)
+            return self.__delete(endpoint)
 
         return data
     
