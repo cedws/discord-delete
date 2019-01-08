@@ -1,13 +1,14 @@
-import time
+import aiohttp
+import asyncio
 import os
-import requests
+import csv
 
 from argparse import ArgumentParser
 from csv import DictReader
 
-# Constants
 API = "https://discordapp.com/api/v6" 
 
+"""
 parser = ArgumentParser()
 
 action = parser.add_subparsers(
@@ -48,96 +49,107 @@ parser.add_argument(
     required=True,
     help="Your Discord account password."
 )
-
-args = parser.parse_args()
-
-def main():
-    discord = Discord(args.email, args.password)
-
-    if wipe:
-        wipe_messages(discord, args.data)
-
-    if clear:
-        clear_messages(discord)
-
-def wipe_messages(discord, root):
-    path = os.path.join(root, "messages")
-
-    for sub in os.listdir(path):
-        if not os.path.isdir("{}/{}".format(path, sub)): 
-            continue
-        
-        messages = open("{}/{}/messages.csv".format(path, sub), "r")
-        reader = DictReader(messages)
-        
-        for line in reader:
-            print(discord.delete_message(sub, line["ID"]))
-
-def clear_messages(discord):
-    # TODO: Delete from guilds too.
-    channels = discord.get_channels()
-    
-    for channel in channels:
-        messages = discord.get_messages(channel["id"])
-
-        for message in messages:
-            # TODO: Better output.
-            print(discord.delete_message(channel["id"], message["id"]))
+"""
 
 class Discord:
-    def __token(email, password):
-        return requests.post("{}/auth/login".format(API), json={ 
+    async def login(email, password):
+        payload = {
             "email": email,
             "password": password
-        }).json()["token"]
+        }
 
-    def __init__(self, email, password):
-        self.token = Discord.__token(email, password)
+        async with aiohttp.ClientSession() as session:
+            async with session.post("{}/auth/login".format(API), json=payload) as resp:
+                return Discord((await resp.json())["token"])
 
-    def __get(self, endpoint):
-        res = requests.get(
-            endpoint, 
-            headers={ "Authorization": self.token }
-        )
+    def __init__(self, token):
+        self.token = token
 
-        data = res.json()
+    async def _req(self, method, endpoint):
+        async with aiohttp.ClientSession() as session:
+            async with session.request(method, "{}/{}".format(API, endpoint), headers={ "Authorization": self.token }) as resp:
+                try:
+                    data = await resp.json()
+                except Exception:
+                    return None
 
-        # If we're being rate limited, wait for a while.
-        if res.status_code == 429:
-            time.sleep(data["retry_after"])
-            return self.__get(endpoint)
+                # If we're being rate limited, wait for a while.
+                if resp.status == 429:
+                    await asyncio.sleep(data["retry_after"] / 1000)
+                    return await self._req(method, endpoint)
 
-        return data
+                return data
 
-    def __delete(self, endpoint):
-        res = requests.delete(
-            endpoint, 
-            headers={ "Authorization": self.token }
-        )
+    async def me(self):
+        return await self._req("GET", "/users/@me")
 
-        data = res.json()
+    async def channels(self):
+        return await self._req("GET", "/users/@me/channels")
 
-        # If we're being rate limited, wait for a while.
-        if res.status_code == 429:
-            time.sleep(data["retry_after"])
-            return self.__delete(endpoint)
+    async def guilds(self):
+        return await self._req("GET", "/users/@me/guilds")
 
-        return data
-    
-    def get_me(self):
-        return self.__get("{}/users/@me".format(API))
+    async def guild_messages(self, gid, aid):
+        return await self._req("GET", "/guilds/{}/messages/search?author_id={}&include_nsfw=true&limit=25".format(gid, aid))
 
-    def get_channels(self):
-        return self.__get("{}/users/@me/channels".format(API))
+    async def channel_messages(self, cid, aid):
+        return await self._req("GET", "/channels/{}/messages/search?author_id={}&include_nsfw=true&limit=25".format(cid, aid))
 
-    def get_guilds(self):
-        return self.__get("{}/users/@me/guilds".format(API))
+    async def delete_message(self, cid, mid):
+        return await self._req("DELETE", "/channels/{}/messages/{}".format(cid, mid))
 
-    def get_messages(self, cid):
-        return self.__get("{}/channels/{}/messages".format(API, cid))
+async def delete_from_current(discord):
+    me = await discord.me()
+    guilds = await discord.guilds()
 
-    def delete_message(self, cid, mid):
-        return self.__delete("{}/channels/{}/messages/{}".format(API, cid, mid))
+    for guild in guilds:
+        messages = await discord.guild_messages(guild["id"], me["id"])
 
-if __name__ == "__main__":
-    main()
+        if not "total_results" in messages:
+            continue
+
+        while messages["total_results"] != 0:
+            for context in messages["messages"]:
+                for message in context:
+                    if message["author"]["id"] == me["id"]:
+                        print(message["id"])
+                        await discord.delete_message(message["channel_id"], message["id"])
+
+            messages = await discord.guild_messages(guild["id"], me["id"])
+
+    channels = await discord.channels()
+
+    for channel in channels:
+        messages = await discord.channel_messages(channel["id"], me["id"])
+
+        if not "messages" in messages:
+            continue
+
+        for message in messages["messages"]:
+            for context in messages["messages"]:
+                for message in context:
+                    if message["author"]["id"] == me["id"]:
+                        print(message["id"])
+                        await discord.delete_message(message["channel_id"], message["id"])
+
+            messages = await discord.channel_messages(channel["id"], me["id"])
+
+async def delete_from_all(discord):
+    for filename in os.listdir("./messages"):
+        if not os.path.isdir("./messages/{}".format(filename)):
+            return
+
+        messages = open("./messages/{}/messages.csv".format(filename), "r")
+        reader = DictReader(messages)
+
+        for line in reader:
+            print(line["ID"])
+            await discord.delete_message(filename, line["ID"])
+
+async def main():
+    discord = await Discord.login("", "")
+    await delete_from_current(discord)
+    # await delete_from_all(discord)
+
+loop = asyncio.get_event_loop()
+loop.run_until_complete(main())
