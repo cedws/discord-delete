@@ -3,10 +3,10 @@ import asyncio
 import os
 import csv
 
-from aiohttp import ClientResponseError
 from csv import DictReader
 
 API = "https://discordapp.com/api/v6"
+LIMIT = 25
 ENDPOINTS = {
     "me":               "/users/@me",
     "relationships":    "/users/@me/relationships",
@@ -16,22 +16,48 @@ ENDPOINTS = {
                             "/guilds/{}/messages/search"
                             "?author_id={}"
                             "&include_nsfw=true"
-                            "&limit=25"
+                            "&limit={}"
                         ),
     "channels":         "/users/@me/channels",
     "channel_msgs":     (
                             "/channels/{}/messages/search"
                             "?author_id={}"
                             "&include_nsfw=true"
-                            "&limit=25"
+                            "&limit={}"
                         ),
     "delete_msg":       "/channels/{}/messages/{}"
 }
+
+class CacheItem:
+    def __init__(self, method, endpoint, json, body=None):
+        self.method = method
+        self.endpoint = endpoint
+        self.body = body
+        self.json = json
+
+class Cache:
+    def __init__(self):
+        self.cached = []
+
+    def get(self, method, endpoint, body=None):
+        return next(
+            (i for i in self.cached if
+                i.method == method and
+                i.endpoint == endpoint and
+                i.body == body
+            ),
+            None
+        )
+
+    def put(self, method, endpoint, json, body=None):
+        item = CacheItem(method, endpoint, json, body)
+        self.cached.append(item)
 
 class Discord:
     def __init__(self, token):
         self.token = token
         self.session = aiohttp.ClientSession(loop=loop)
+        self.cache = Cache()
 
     async def __aenter__(self):
         return self
@@ -39,89 +65,124 @@ class Discord:
     async def __aexit__(self, *args):
         await self.session.close()
 
-    async def _req(self, method, endpoint, body=None):
+    async def _req(self, method, endpoint, body=None, cache=False):
+        if cache:
+            cached = self.cache.get(method, endpoint, body=body)
+            if cached:
+                return cached.json
+
         url = "{}/{}".format(API, endpoint)
         headers = { "Authorization": self.token }
 
         async with self.session.request(method, url,
                 headers=headers,
                 json=body) as resp:
-            try:
-                json = await resp.json()
-            except ClientResponseError:
-                # If we're being rate limited, wait for a while.
-                if resp.status == 429:
-                    assert "retry_after" in json
-                    await asyncio.sleep(json.get("retry_after") / 1000)
-                    return await self._req(method, endpoint, body)
-                if resp.status >= 500:
-                    exit("Server reported internal error.")
+            if resp.status >= 500:
+                exit("Server reported internal error.")
+            if resp.status == 404:
                 return {}
-            except Exception:
-                raise
+            if resp.status == 204:
+                return {}
 
-            return json
+            json = await resp.json()
+
+            # If we're being rate limited, wait for a while.
+            if resp.status == 429:
+                assert "retry_after" in json
+                await asyncio.sleep(json.get("retry_after") / 1000)
+                return await self._req(method, endpoint, body)
+            if resp.status == 200:
+                if cache:
+                    self.cache.put(method, endpoint, json, body=body)
+
+                return json
+
+            return {}
 
     async def me(self):
-        return await self._req("GET",
-            ENDPOINTS["me"])
+        return await self._req(
+            "GET",
+            ENDPOINTS["me"],
+            cache=True
+        )
 
     async def relationships(self):
-        return await self._req("GET",
-            ENDPOINTS["relationships"])
+        return await self._req(
+            "GET",
+            ENDPOINTS["relationships"],
+            cache=True,
+        )
 
     async def relationship_channels(self, r_id):
-        return await self._req("POST",
-            ENDPOINTS["channels"], {
-                "recipients": [r_id]
-            })
+        return await self._req(
+            "POST",
+            ENDPOINTS["channels"],
+            body={ "recipients": [r_id] },
+            cache=True,
+        )
 
     async def guilds(self):
-        return await self._req("GET",
-            ENDPOINTS["guilds"])
+        return await self._req(
+            "GET",
+            ENDPOINTS["guilds"],
+            cache=True
+        )
 
     async def guild_msgs(self, g_id, a_id):
-        return await self._req("GET",
-            ENDPOINTS["guild_msgs"].format(g_id, a_id))
+        return await self._req(
+            "GET",
+            ENDPOINTS["guild_msgs"].format(g_id, a_id, LIMIT)
+        )
 
     async def channels(self):
-        return await self._req("GET",
-            ENDPOINTS["channels"])
+        return await self._req(
+            "GET",
+            ENDPOINTS["channels"],
+            cache=True
+        )
 
     async def channel_msgs(self, c_id, a_id):
-        return await self._req("GET",
-            ENDPOINTS["channel_msgs"].format(c_id, a_id))
+        return await self._req(
+            "GET",
+            ENDPOINTS["channel_msgs"].format(c_id, a_id, LIMIT)
+        )
 
     async def delete_msg(self, c_id, m_id):
-        return await self._req("DELETE",
-            ENDPOINTS["delete_msg"].format(c_id, m_id))
+        return await self._req(
+            "DELETE",
+            ENDPOINTS["delete_msg"].format(c_id, m_id),
+            cache=True,
+        )
 
     async def delete_from_current(self):
         """
 
-        Delete messages from the conversations and servers the user currently participates in.
+        Delete messages from the conversations and servers the user currently
+        participates in.
 
         """
         me_id = (await self.me()).get("id")
         assert me_id
 
         channels = await self.channels()
-        c_ids = [channel.get("id") for channel in channels]
+        c_ids = [c.get("id") for c in channels]
 
         for c_id in c_ids:
             await self.delete_from_channel(me_id, c_id)
 
         relations = await self.relationships()
-        r_ids = [relation.get("id") for relation in relations]
+        r_ids = [r.get("id") for r in relations]
+
+        c_recipients = [c.get("recipients")[0] for c in channels]
+        c_recipient_ids = [c_r.get("id") for c_r in c_recipients]
 
         for r_id in r_ids:
-            channel = await self.relationship_channels(r_id)
-
-            if not channel.get("id") in c_ids:
+            if not r_id in c_recipient_ids:
+                channel = await self.relationship_channels(r_id)
                 await self.delete_from_channel(me_id, channel.get("id"))
 
         guilds = await self.guilds()
-        g_ids = [guild.get("id") for guild in guilds]
+        g_ids = [g.get("id") for g in guilds]
 
         for g_id in g_ids:
             await self.delete_from_guild(me_id, g_id)
@@ -129,22 +190,24 @@ class Discord:
     async def delete_from_channel(self, me_id, c_id):
         print("Deleting messages in channel {}...".format(c_id))
 
-        results = True
-        while results:
+        results = LIMIT
+        while results >= LIMIT:
             mlist = await self.channel_msgs(c_id, me_id)
-            await self.delete_msgs(mlist.get("messages"))
+            messages = mlist.get("messages")
 
-            results = mlist.get("total_results")
+            await self.delete_msgs(messages)
+            results = len(messages)
 
     async def delete_from_guild(self, me_id, g_id):
         print("Deleting messages in guild {}...".format(g_id))
 
-        results = True
-        while results:
+        results = LIMIT
+        while results >= LIMIT:
             mlist = await self.guild_msgs(g_id, me_id)
-            await self.delete_msgs(mlist.get("messages"))
+            messages = mlist.get("messages")
 
-            results = mlist.get("total_results")
+            await self.delete_msgs(messages)
+            results = len(messages)
 
     async def delete_msgs(self, msgs):
         if msgs == None:
@@ -163,7 +226,8 @@ class Discord:
     async def delete_from_all(self):
         """
 
-        Delete messages from the user's entire history by using a data download package.
+        Delete messages from the user's entire history by using a data download
+        package.
 
         """
 
