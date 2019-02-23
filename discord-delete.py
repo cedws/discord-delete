@@ -194,13 +194,14 @@ class Discord:
         r_ids = [r.get("id") for r in relations]
 
         # This code gathers a list of recipients who the user is in contact with,
-        # but filters only those who are the *sole* recipient (that the
+        # but includes only those who are the *sole* recipient (that the
         # user might be friends with).
         c_recipients = [
             c.get("recipients")[0]
             for c in channels
             if len(c.get("recipients")) == 1
         ]
+        # Get the ID for each recipient from the list above.
         c_recipient_ids = [c_r.get("id") for c_r in c_recipients]
 
         for r_id in r_ids:
@@ -209,6 +210,9 @@ class Discord:
             # channels requires double the requests so we need to avoid doing it
             # if possible.
             if not r_id in c_recipient_ids:
+                # Get the direct message channel with this recipient.
+                # This wouldn't necessarily have been found earlier because
+                # hidden channels aren't returned by the API.
                 channel = await self.relationship_channels(r_id)
                 await self.delete_from_channel(me_id, channel.get("id"))
 
