@@ -1,9 +1,31 @@
 import aiohttp
 import asyncio
+import argparse
+import logging
 import os
 import csv
 
 from csv import DictReader
+
+parser = argparse.ArgumentParser(
+    description="Powerful script to delete full Discord message history")
+
+parser.add_argument("-v", "--verbose",
+    action="store_true",
+    help="enable verbose logging")
+
+subcommand = parser.add_subparsers(
+    dest="cmd")
+
+partial = subcommand.add_parser("partial",
+    help="run a partial message deletion.")
+
+#full = subcommand.add_parser("full",
+#    help="run a full message deletion using a data request package")
+
+#full.add_argument("-z", "--zip",
+#    required=True,
+#    help="path to the zipped data request package.")
 
 API = "https://discordapp.com/api/v6"
 LIMIT = 25
@@ -66,11 +88,13 @@ class Discord:
         await self.session.close()
 
     async def _req(self, method, endpoint, body=None, cache=False):
+        logging.debug("%s %s", method, endpoint)
         if cache:
             cached = self.cache.get(method, endpoint, body=body)
             # We've made a request like this already and it's safe to return the
             # cached response.
             if cached:
+                logging.debug("Using cached response.")
                 return cached.json
 
         url = "{}/{}".format(API, endpoint)
@@ -96,8 +120,12 @@ class Discord:
             # Too Many Requests
             if resp.status == 429:
                 # If we're being rate limited, wait for a while.
-                assert "retry_after" in json
-                await asyncio.sleep(json.get("retry_after") / 1000)
+                delay = json.get("retry_after")
+                assert delay > 0
+
+                logging.debug("Hit rate limit, waiting for a while.")
+                await asyncio.sleep(delay / 1000)
+
                 return await self._req(method, endpoint, body)
             # OK
             if resp.status == 200:
@@ -175,7 +203,11 @@ class Discord:
         # Request information about the user and get their unique ID.
         # The user should always have an ID.
         me_id = (await self.me()).get("id")
-        assert me_id
+        if not me_id:
+            logging.error("Failed to get user, is the auth token correct?")
+            return
+
+        logging.debug("User ID is %s.", me_id)
 
         # Gather a list of channels that the user is in. Channels are direct
         # messages which may be from groups or 1-to-1. Direct message
@@ -215,6 +247,8 @@ class Discord:
                 # hidden channels aren't returned by the API.
                 channel = await self.relationship_channels(r_id)
                 await self.delete_from_channel(me_id, channel.get("id"))
+            else:
+                logging.debug("Skipped recipient channel %s.", r_id)
 
         # Gather a list of guilds (known by many as "servers"). This doesn't
         # include guilds that the user has left.
@@ -225,7 +259,7 @@ class Discord:
             await self.delete_from_guild(me_id, g_id)
 
     async def delete_from_channel(self, me_id, c_id):
-        print("Deleting messages in channel {}...".format(c_id))
+        logging.info("Deleting messages in channel %s...", c_id)
 
         # Avoids making unnecessary requests if the number of messages returned
         # is less that LIMIT, indicating there isn't another page of messages.
@@ -234,12 +268,16 @@ class Discord:
             mlist = await self.channel_msgs(c_id, me_id)
             messages = mlist.get("messages")
 
-            await self.delete_msgs(messages)
-            # We avoid using the "total_results" field as it is often inaccurate.
-            results = len(messages)
+            if messages:
+                await self.delete_msgs(messages)
+                # We avoid using the "total_results" field as it is often inaccurate.
+                # messages might be None.
+                results = len(messages)
+            else:
+                break
 
     async def delete_from_guild(self, me_id, g_id):
-        print("Deleting messages in guild {}...".format(g_id))
+        logging.info("Deleting messages in guild %s...", g_id)
 
         # Avoids making unnecessary requests if the number of messages returned
         # is less that LIMIT, indicating there isn't another page of messages.
@@ -248,12 +286,16 @@ class Discord:
             mlist = await self.guild_msgs(g_id, me_id)
             messages = mlist.get("messages")
 
-            await self.delete_msgs(messages)
-            # We avoid using the "total_results" field as it is often inaccurate.
-            results = len(messages)
+            if messages:
+                await self.delete_msgs(messages)
+                # We avoid using the "total_results" field as it is often inaccurate.
+                # messages might be None.
+                results = len(messages)
+            else:
+                break
 
     async def delete_msgs(self, msgs):
-        if msgs == None:
+        if not msgs:
             return
 
         for context in msgs:
@@ -264,21 +306,20 @@ class Discord:
             msg = next(m for m in context if m.get("hit"))
             assert msg
 
-            print("\t- {}".format(msg.get("id")))
+            logging.info("\t- %s", msg.get("id"))
             await self.delete_msg(
                 msg.get("channel_id"),
                 msg.get("id")
             )
 
-    async def delete_from_all(self):
+    async def delete_from_all(self, zip):
         """
 
-        Delete messages from the user's entire history by using a data download
+        Delete messages from the user's entire history by using a data request
         package.
 
         """
 
-        # TODO: Clean this up.
         if not os.path.isdir("./messages"):
             return
 
@@ -293,13 +334,23 @@ class Discord:
                 await self.delete_msg(filename, line["ID"])
 
 async def main():
+    args = parser.parse_args()
+
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
+
     # TODO: More secure way of passing this value.
     token = os.environ.get("DISCORD_TOKEN")
 
     if token:
         async with Discord(token) as client:
-            await client.delete_from_current()
-            await client.delete_from_all()
+            if args.cmd == "partial":
+                await client.delete_from_current()
+            if args.cmd == "full":
+                # TODO
+                await client.delete_from_all(args.zip)
     else:
        print("You must pass a Discord auth token by setting DISCORD_TOKEN.")
 
