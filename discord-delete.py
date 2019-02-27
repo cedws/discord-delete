@@ -218,7 +218,7 @@ class Discord:
         c_ids = [c.get("id") for c in channels]
 
         for c_id in c_ids:
-            await self.delete_from_channel(me_id, c_id)
+            await self.delete_from(self.channel_msgs, me_id, c_id)
 
         # Gather a lot of relationships the user has. These are people that the
         # user has in one of their lists (All/Pending/Blocked).
@@ -245,8 +245,12 @@ class Discord:
                 # Get the direct message channel with this recipient.
                 # This wouldn't necessarily have been found earlier because
                 # hidden channels aren't returned by the API.
-                channel = await self.relationship_channels(r_id)
-                await self.delete_from_channel(me_id, channel.get("id"))
+                rc_id = await self.relationship_channels(r_id).get("id")
+
+                # There should be a channel ID in all cases.
+                assert rc_id
+
+                await self.delete_from(self.channel_msgs, me_id, rc_id)
             else:
                 logging.debug("Skipped recipient channel %s.", r_id)
 
@@ -256,34 +260,16 @@ class Discord:
         g_ids = [g.get("id") for g in guilds]
 
         for g_id in g_ids:
-            await self.delete_from_guild(me_id, g_id)
+            await self.delete_from(self.guild_msgs, me_id, g_id)
 
-    async def delete_from_channel(self, me_id, c_id):
-        logging.info("Deleting messages in channel %s...", c_id)
-
-        # Avoids making unnecessary requests if the number of messages returned
-        # is less that LIMIT, indicating there isn't another page of messages.
-        results = LIMIT
-        while results >= LIMIT:
-            mlist = await self.channel_msgs(c_id, me_id)
-            messages = mlist.get("messages")
-
-            if messages:
-                await self.delete_msgs(messages)
-                # We avoid using the "total_results" field as it is often inaccurate.
-                # messages might be None.
-                results = len(messages)
-            else:
-                break
-
-    async def delete_from_guild(self, me_id, g_id):
-        logging.info("Deleting messages in guild %s...", g_id)
+    async def delete_from(self, get_msgs, me_id, u_id):
+        logging.info("Deleting messages from %s...", u_id)
 
         # Avoids making unnecessary requests if the number of messages returned
         # is less that LIMIT, indicating there isn't another page of messages.
         results = LIMIT
         while results >= LIMIT:
-            mlist = await self.guild_msgs(g_id, me_id)
+            mlist = await get_msgs(u_id, me_id)
             messages = mlist.get("messages")
 
             if messages:
@@ -299,8 +285,8 @@ class Discord:
             return
 
         for context in msgs:
-            # The "hit" field is highlighted message. The other messages are for
-            # context and may not be authored by the user, so we ignore them.
+            # The "hit" field is the highlighted message. The other messages are
+            # for context and may not be authored by the user, so we ignore them.
             # At least one message in the context group should have the "hit"
             # field.
             msg = next(m for m in context if m.get("hit"))
