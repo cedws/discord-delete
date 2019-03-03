@@ -107,7 +107,7 @@ class Discord:
 
             logging.debug("Got status %d from server.", resp.status)
 
-            data = None
+            data = {}
 
             # Internal Server Error
             if resp.status >= 500:
@@ -128,6 +128,9 @@ class Discord:
             # Not Found
             elif resp.status == 404:
                 pass
+            # Unauthorized
+            elif resp.status == 401:
+                pass
             # No Content
             elif resp.status == 204:
                 pass
@@ -136,7 +139,7 @@ class Discord:
                 data = await resp.json()
             else:
                 logging.debug("Unknown status, response will not be cached.")
-                return
+                return data
 
             if cache:
                 logging.debug("Caching response.")
@@ -211,7 +214,10 @@ class Discord:
         # The user should always have an ID.
         me_id = (await self.me()).get("id")
         if not me_id:
-            logging.error("Failed to get user, is the auth token correct?")
+            logging.error(
+                "Failed to get user, auth token might have expired or"
+                " be invalid."
+            )
             return
 
         logging.debug("User ID is %s.", me_id)
