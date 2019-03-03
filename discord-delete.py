@@ -89,54 +89,60 @@ class Discord:
 
     async def _req(self, method, endpoint, body=None, cache=False):
         logging.debug("%s %s", method, endpoint)
+
         if cache:
             cached = self.cache.get(method, endpoint, body=body)
-            # We've made a request like this already and it's safe to return the
-            # cached response.
+
             if cached:
+                # We've made a request like this already and it's safe to return the
+                # cached response.
                 logging.debug("Using cached response.")
                 return cached.json
 
         url = "{}/{}".format(API, endpoint)
         headers = { "Authorization": self.token }
 
-        async with self.session.request(method, url,
-                headers=headers,
+        async with self.session.request(method, url, headers=headers,
                 json=body) as resp:
+
+            logging.debug("Got status %d from server.", resp.status)
+
+            data = None
+
             # Internal Server Error
             if resp.status >= 500:
-                exit("Server reported internal error.")
-            # Not Found
-            if resp.status == 404:
-                return {}
-            # No Content
-            if resp.status == 204:
-                return {}
-
-            # We should definitely get a JSON response if the status wasn't
-            # one of the above.
-            json = await resp.json()
-
+                logging.error("Server reported internal error, aborting.")
+                exit()
             # Too Many Requests
-            if resp.status == 429:
+            elif resp.status == 429:
+                data = await resp.json()
+
                 # If we're being rate limited, wait for a while.
-                delay = json.get("retry_after")
+                delay = data.get("retry_after")
                 assert delay > 0
 
                 logging.debug("Hit rate limit, waiting for a while.")
                 await asyncio.sleep(delay / 1000)
 
                 return await self._req(method, endpoint, body)
+            # Not Found
+            elif resp.status == 404:
+                pass
+            # No Content
+            elif resp.status == 204:
+                pass
             # OK
-            if resp.status == 200:
-                if cache:
-                    self.cache.put(method, endpoint, json, body=body)
+            elif resp.status == 200:
+                data = await resp.json()
+            else:
+                logging.debug("Unknown status, response will not be cached.")
+                return
 
-                return json
+            if cache:
+                logging.debug("Caching response.")
+                self.cache.put(method, endpoint, data, body=body)
 
-            # Return an empty response, something unusual happened. Won't be
-            # cached.
-            return {}
+            return data
 
     async def me(self):
         return await self._req(
@@ -200,6 +206,7 @@ class Discord:
         participates in.
 
         """
+
         # Request information about the user and get their unique ID.
         # The user should always have an ID.
         me_id = (await self.me()).get("id")
@@ -268,15 +275,21 @@ class Discord:
         # Avoids making unnecessary requests if the number of messages returned
         # is less that LIMIT, indicating there isn't another page of messages.
         results = LIMIT
-        while results >= LIMIT:
+
+        # Note the -1, there seems to be some kind of bug in the API where it
+        # will sometimes return one less than the results limit.
+        # TODO: Look into a better workaround.
+        while results >= LIMIT - 1:
             mlist = await get_msgs(u_id, me_id)
             messages = mlist.get("messages")
 
             if messages:
-                await self.delete_msgs(messages)
                 # We avoid using the "total_results" field as it is often inaccurate.
                 # messages might be None.
                 results = len(messages)
+                logging.debug("Found %d more messages to process.", results)
+
+                await self.delete_msgs(messages)
             else:
                 break
 
@@ -338,7 +351,7 @@ async def main():
                 # TODO
                 await client.delete_from_all(args.zip)
     else:
-       print("You must pass a Discord auth token by setting DISCORD_TOKEN.")
+       logging.info("You must pass a Discord auth token by setting DISCORD_TOKEN.")
 
 loop = asyncio.get_event_loop()
 loop.run_until_complete(main())
