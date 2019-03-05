@@ -3,8 +3,9 @@ import asyncio
 import argparse
 import logging
 import os
-import csv
 
+from zipfile import ZipFile, BadZipFile
+from io import StringIO
 from csv import DictReader
 
 parser = argparse.ArgumentParser(
@@ -20,12 +21,12 @@ subcommand = parser.add_subparsers(
 partial = subcommand.add_parser("partial",
     help="run a partial message deletion.")
 
-#full = subcommand.add_parser("full",
-#    help="run a full message deletion using a data request package")
+full = subcommand.add_parser("full",
+    help="run a full message deletion using a data request package")
 
-#full.add_argument("-z", "--zip",
-#    required=True,
-#    help="path to the zipped data request package.")
+full.add_argument("-p", "--package",
+    required=True,
+    help="path to the data request package.")
 
 API = "https://discordapp.com/api/v6"
 LIMIT = 25
@@ -94,8 +95,8 @@ class Discord:
             cached = self.cache.get(method, endpoint, body=body)
 
             if cached:
-                # We've made a request like this already and it's safe to return the
-                # cached response.
+                # We've made a request like this already and it's safe to return
+                # the cached response.
                 logging.debug("Using cached response.")
                 return cached.json
 
@@ -127,10 +128,16 @@ class Discord:
                 return await self._req(method, endpoint, body)
             # Not Found
             elif resp.status == 404:
-                pass
+                logging.warning(
+                    "Server sent Not Found. Resource may have been "
+                    "deleted."
+                )
+            # Forbidden
+            elif resp.status == 403:
+                logging.warning("Server sent Forbidden.")
             # Unauthorized
             elif resp.status == 401:
-                pass
+                logging.warning("Server sent Unauthorized.")
             # No Content
             elif resp.status == 204:
                 pass
@@ -215,8 +222,8 @@ class Discord:
         me_id = (await self.me()).get("id")
         if not me_id:
             logging.error(
-                "Failed to get user, auth token might have expired or"
-                " be invalid."
+                "Failed to get user, auth token might have expired or "
+                "be invalid."
             )
             return
 
@@ -290,34 +297,28 @@ class Discord:
             messages = mlist.get("messages")
 
             if messages:
-                # We avoid using the "total_results" field as it is often inaccurate.
-                # messages might be None.
+                # We avoid using the "total_results" field as it is often
+                # inaccurate.
                 results = len(messages)
                 logging.debug("Found %d more messages to process.", results)
 
-                await self.delete_msgs(messages)
+                for context in messages:
+                    # The "hit" field is the highlighted message. The other
+                    # messages are for context and may not be authored by the
+                    # user, so we ignore them. At least one message in the
+                    # context group should have the "hit" field.
+                    msg = next(m for m in context if m.get("hit"))
+                    assert msg
+
+                    logging.info("\t- %s", msg.get("id"))
+                    await self.delete_msg(
+                        msg.get("channel_id"),
+                        msg.get("id")
+                    )
             else:
                 break
 
-    async def delete_msgs(self, msgs):
-        if not msgs:
-            return
-
-        for context in msgs:
-            # The "hit" field is the highlighted message. The other messages are
-            # for context and may not be authored by the user, so we ignore them.
-            # At least one message in the context group should have the "hit"
-            # field.
-            msg = next(m for m in context if m.get("hit"))
-            assert msg
-
-            logging.info("\t- %s", msg.get("id"))
-            await self.delete_msg(
-                msg.get("channel_id"),
-                msg.get("id")
-            )
-
-    async def delete_from_all(self, zip):
+    async def delete_from_all(self, path):
         """
 
         Delete messages from the user's entire history by using a data request
@@ -325,18 +326,44 @@ class Discord:
 
         """
 
-        if not os.path.isdir("./messages"):
+        if not os.path.exists(path):
+            logging.error(
+                "The specified data request package does not "
+                "exist."
+            )
             return
 
-        for filename in os.listdir("./messages"):
-            if not os.path.isdir("./messages/{}".format(filename)):
-                return
+        try:
+            data = ZipFile(path)
+        except BadZipFile:
+            logging.error(
+                "The specified data request package is invalid "
+                "(bad ZIP file)."
+            )
+            return
 
-            msgs = open("./messages/{}/messages.csv".format(filename), "r")
+        channels = [
+            file for file in data.namelist()
+            if "messages.csv" in file
+        ]
+
+        logging.debug("Found %d channels to search.", len(channels))
+
+        for channel in channels:
+            msgs = StringIO(data.read(channel).decode("utf8"))
             reader = DictReader(msgs)
 
+            c_id = channel.split("/")[1]
+            assert c_id
+
+            logging.info("Deleting messages from %s...", c_id)
+
             for line in reader:
-                await self.delete_msg(filename, line["ID"])
+                msg = line["ID"]
+                assert msg
+
+                logging.info("\t- %s", msg)
+                await self.delete_msg(c_id, msg)
 
 async def main():
     args = parser.parse_args()
@@ -354,10 +381,11 @@ async def main():
             if args.cmd == "partial":
                 await client.delete_from_current()
             if args.cmd == "full":
-                # TODO
-                await client.delete_from_all(args.zip)
+                await client.delete_from_all(args.package)
     else:
-       logging.info("You must pass a Discord auth token by setting DISCORD_TOKEN.")
+        logging.info(
+            "You must pass a Discord auth token by setting DISCORD_TOKEN."
+        )
 
 loop = asyncio.get_event_loop()
 loop.run_until_complete(main())
