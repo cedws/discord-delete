@@ -1,32 +1,42 @@
 import aiohttp
 import asyncio
-import argparse
 import logging
 import os
 
+from argparse import ArgumentParser
 from zipfile import ZipFile, BadZipFile
 from io import StringIO
 from csv import DictReader
 
-parser = argparse.ArgumentParser(
-    description="Powerful script to delete full Discord message history")
+parser = ArgumentParser(
+    description="Powerful script to delete full Discord message history"
+)
 
-parser.add_argument("-v", "--verbose",
+parser.add_argument(
+    "-v", "--verbose",
     action="store_true",
-    help="enable verbose logging")
+    help="enable verbose logging"
+)
 
 subcommand = parser.add_subparsers(
-    dest="cmd")
+    dest="cmd"
+)
 
-partial = subcommand.add_parser("partial",
-    help="run a partial message deletion.")
+partial = subcommand.add_parser(
+    "partial",
+    help="run a partial message deletion."
+)
 
-full = subcommand.add_parser("full",
-    help="run a full message deletion using a data request package")
+full = subcommand.add_parser(
+    "full",
+    help="run a full message deletion using a data request package"
+)
 
-full.add_argument("-p", "--package",
+full.add_argument(
+    "-p", "--package",
     required=True,
-    help="path to the data request package.")
+    help="path to the data request package."
+)
 
 API = "https://discordapp.com/api/v6"
 LIMIT = 25
@@ -261,18 +271,19 @@ class Discord:
             # checked the recipient channel earlier. Checking relationship
             # channels requires double the requests so we need to avoid doing it
             # if possible.
-            if not r_id in c_recipient_ids:
-                # Get the direct message channel with this recipient.
-                # This wouldn't necessarily have been found earlier because
-                # hidden channels aren't returned by the API.
-                rc_id = await self.relationship_channels(r_id).get("id")
-
-                # There should be a channel ID in all cases.
-                assert rc_id
-
-                await self.delete_from(self.channel_msgs, me_id, rc_id)
-            else:
+            if r_id in c_recipient_ids:
                 logging.debug("Skipped recipient channel %s.", r_id)
+                continue
+
+            # Get the direct message channel with this recipient.
+            # This wouldn't necessarily have been found earlier because
+            # hidden channels aren't returned by the API.
+            rc_id = await self.relationship_channels(r_id).get("id")
+
+            # There should be a channel ID in all cases.
+            assert rc_id
+
+            await self.delete_from(self.channel_msgs, me_id, rc_id)
 
         # Gather a list of guilds (known by many as "servers"). This doesn't
         # include guilds that the user has left.
@@ -296,27 +307,27 @@ class Discord:
             mlist = await get_msgs(u_id, me_id)
             messages = mlist.get("messages")
 
-            if messages:
-                # We avoid using the "total_results" field as it is often
-                # inaccurate.
-                results = len(messages)
-                logging.debug("Found %d more messages to process.", results)
-
-                for context in messages:
-                    # The "hit" field is the highlighted message. The other
-                    # messages are for context and may not be authored by the
-                    # user, so we ignore them. At least one message in the
-                    # context group should have the "hit" field.
-                    msg = next(m for m in context if m.get("hit"))
-                    assert msg
-
-                    logging.info("\t- %s", msg.get("id"))
-                    await self.delete_msg(
-                        msg.get("channel_id"),
-                        msg.get("id")
-                    )
-            else:
+            if not messages:
                 break
+
+            # We avoid using the "total_results" field as it is often
+            # inaccurate.
+            results = len(messages)
+            logging.debug("Found %d more messages to process.", results)
+
+            for context in messages:
+                # The "hit" field is the highlighted message. The other
+                # messages are for context and may not be authored by the
+                # user, so we ignore them. At least one message in the
+                # context group should have the "hit" field.
+                msg = next(m for m in context if m.get("hit"))
+                assert msg
+
+                logging.info("\t- %s", msg.get("id"))
+                await self.delete_msg(
+                    msg.get("channel_id"),
+                    msg.get("id")
+                )
 
     async def delete_from_all(self, path):
         """
@@ -376,16 +387,17 @@ async def main():
     # TODO: More secure way of passing this value.
     token = os.environ.get("DISCORD_TOKEN")
 
-    if token:
-        async with Discord(token) as client:
-            if args.cmd == "partial":
-                await client.delete_from_current()
-            if args.cmd == "full":
-                await client.delete_from_all(args.package)
-    else:
+    if not token:
         logging.info(
             "You must pass a Discord auth token by setting DISCORD_TOKEN."
         )
+        return
+
+    async with Discord(token) as client:
+        if args.cmd == "partial":
+            await client.delete_from_current()
+        if args.cmd == "full":
+            await client.delete_from_all(args.package)
 
 loop = asyncio.get_event_loop()
 loop.run_until_complete(main())
