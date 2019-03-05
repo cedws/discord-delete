@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import aiohttp
 import asyncio
 import logging
