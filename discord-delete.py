@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-import aiohttp
 import asyncio
 import logging
 import os
 
+from aiohttp import ClientSession
 from argparse import ArgumentParser
 from zipfile import ZipFile, BadZipFile
 from io import StringIO
@@ -91,7 +91,7 @@ class Cache:
 class Discord:
     def __init__(self, token):
         self.token = token
-        self.session = aiohttp.ClientSession(loop=loop)
+        self.session = ClientSession(loop=loop)
         self.cache = Cache()
 
     async def __aenter__(self):
@@ -131,7 +131,7 @@ class Discord:
                 data = await resp.json()
 
                 # If we're being rate limited, wait for a while.
-                delay = data.get("retry_after")
+                delay = data["retry_after"]
                 assert delay > 0
 
                 logging.debug("Hit rate limit, waiting for a while.")
@@ -157,7 +157,7 @@ class Discord:
             elif resp.status == 200:
                 data = await resp.json()
             else:
-                logging.debug("Unknown status, response will not be cached.")
+                logging.warning("Unknown status, response will not be cached.")
                 return data
 
             if cache:
@@ -280,10 +280,7 @@ class Discord:
             # Get the direct message channel with this recipient.
             # This wouldn't necessarily have been found earlier because
             # hidden channels aren't returned by the API.
-            rc_id = await self.relationship_channels(r_id).get("id")
-
-            # There should be a channel ID in all cases.
-            assert rc_id
+            rc_id = (await self.relationship_channels(r_id))["id"]
 
             await self.delete_from(self.channel_msgs, me_id, rc_id)
 
@@ -306,8 +303,8 @@ class Discord:
         # will sometimes return one less than the results limit.
         # TODO: Look into a better workaround.
         while results >= LIMIT - 1:
-            mlist = await get_msgs(u_id, me_id)
-            messages = mlist.get("messages")
+            data = await get_msgs(u_id, me_id)
+            messages = data.get("messages")
 
             if not messages:
                 break
@@ -346,6 +343,14 @@ class Discord:
             )
             return
 
+        me = await self.me()
+        if not me:
+            logging.error(
+                "Failed to get user, auth token might have expired or "
+                "be invalid."
+            )
+            return
+
         try:
             data = ZipFile(path)
         except BadZipFile:
@@ -367,13 +372,11 @@ class Discord:
             reader = DictReader(msgs)
 
             c_id = channel.split("/")[1]
-            assert c_id
 
             logging.info("Deleting messages from %s...", c_id)
 
             for line in reader:
                 msg = line["ID"]
-                assert msg
 
                 logging.info("\t- %s", msg)
                 await self.delete_msg(c_id, msg)
