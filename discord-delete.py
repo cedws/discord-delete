@@ -51,6 +51,7 @@ ENDPOINTS = {
                             "/guilds/{}/messages/search"
                             "?author_id={}"
                             "&include_nsfw=true"
+                            "&offset={}"
                             "&limit={}"
                         ),
     "channels":         "/users/@me/channels",
@@ -58,41 +59,16 @@ ENDPOINTS = {
                             "/channels/{}/messages/search"
                             "?author_id={}"
                             "&include_nsfw=true"
+                            "&offset={}"
                             "&limit={}"
                         ),
     "delete_msg":       "/channels/{}/messages/{}"
 }
 
-class CacheItem:
-    def __init__(self, method, endpoint, json, body=None):
-        self.method = method
-        self.endpoint = endpoint
-        self.body = body
-        self.json = json
-
-class Cache:
-    def __init__(self):
-        self.cached = []
-
-    def get(self, method, endpoint, body=None):
-        return next(
-            (i for i in self.cached if
-                i.method == method and
-                i.endpoint == endpoint and
-                i.body == body
-            ),
-            None
-        )
-
-    def put(self, method, endpoint, json, body=None):
-        item = CacheItem(method, endpoint, json, body)
-        self.cached.append(item)
-
 class Discord:
     def __init__(self, token):
         self.token = token
         self.session = ClientSession(loop=loop)
-        self.cache = Cache()
 
     async def __aenter__(self):
         return self
@@ -100,17 +76,8 @@ class Discord:
     async def __aexit__(self, *args):
         await self.session.close()
 
-    async def _req(self, method, endpoint, body=None, cache=False):
+    async def _req(self, method, endpoint, body=None):
         logging.debug("%s %s", method, endpoint)
-
-        if cache:
-            cached = self.cache.get(method, endpoint, body=body)
-
-            if cached:
-                # We've made a request like this already and it's safe to return
-                # the cached response.
-                logging.debug("Using cached response.")
-                return cached.json
 
         url = "{}/{}".format(API, endpoint)
         headers = { "Authorization": self.token }
@@ -157,68 +124,58 @@ class Discord:
             elif resp.status == 200:
                 data = await resp.json()
             else:
-                logging.warning("Unknown status, response will not be cached.")
-                return data
-
-            if cache:
-                logging.debug("Caching response.")
-                self.cache.put(method, endpoint, data, body=body)
+                logging.warning("Unknown status was sent.")
+                logging.debug(await resp.text())
 
             return data
 
     async def me(self):
         return await self._req(
             "GET",
-            ENDPOINTS["me"],
-            cache=True
+            ENDPOINTS["me"]
         )
 
     async def relationships(self):
         return await self._req(
             "GET",
-            ENDPOINTS["relationships"],
-            cache=True,
+            ENDPOINTS["relationships"]
         )
 
     async def relationship_channels(self, r_id):
         return await self._req(
             "POST",
             ENDPOINTS["channels"],
-            body={ "recipients": [r_id] },
-            cache=True,
+            body={ "recipients": [r_id] }
         )
 
     async def guilds(self):
         return await self._req(
             "GET",
-            ENDPOINTS["guilds"],
-            cache=True
+            ENDPOINTS["guilds"]
         )
 
-    async def guild_msgs(self, g_id, a_id):
+    async def guild_msgs(self, g_id, a_id, offset=0):
         return await self._req(
             "GET",
-            ENDPOINTS["guild_msgs"].format(g_id, a_id, LIMIT)
+            ENDPOINTS["guild_msgs"].format(g_id, a_id, offset, LIMIT)
         )
 
     async def channels(self):
         return await self._req(
             "GET",
-            ENDPOINTS["channels"],
-            cache=True
+            ENDPOINTS["channels"]
         )
 
-    async def channel_msgs(self, c_id, a_id):
+    async def channel_msgs(self, c_id, a_id, offset=0):
         return await self._req(
             "GET",
-            ENDPOINTS["channel_msgs"].format(c_id, a_id, LIMIT)
+            ENDPOINTS["channel_msgs"].format(c_id, a_id, offset, LIMIT)
         )
 
     async def delete_msg(self, c_id, m_id):
         return await self._req(
             "DELETE",
-            ENDPOINTS["delete_msg"].format(c_id, m_id),
-            cache=True,
+            ENDPOINTS["delete_msg"].format(c_id, m_id)
         )
 
     async def delete_from_current(self):
@@ -295,24 +252,13 @@ class Discord:
     async def delete_from(self, get_msgs, me_id, u_id):
         logging.info("Deleting messages from %s...", u_id)
 
-        # Avoids making unnecessary requests if the number of messages returned
-        # is less that LIMIT, indicating there isn't another page of messages.
-        results = LIMIT
+        messages = (await get_msgs(u_id, me_id)).get("messages")
+        offset = 0
 
-        # Note the -1, there seems to be some kind of bug in the API where it
-        # will sometimes return one less than the results limit.
-        # TODO: Look into a better workaround.
-        while results >= LIMIT - 1:
-            data = await get_msgs(u_id, me_id)
-            messages = data.get("messages")
-
-            if not messages:
-                break
-
+        while messages:
             # We avoid using the "total_results" field as it is often
             # inaccurate.
-            results = len(messages)
-            logging.debug("Found %d more messages to process.", results)
+            logging.debug("Found %d more messages to process.", len(messages))
 
             for context in messages:
                 # The "hit" field is the highlighted message. The other
@@ -322,11 +268,17 @@ class Discord:
                 msg = next(m for m in context if m.get("hit"))
                 assert msg
 
+                if msg.get("type") != 0:
+                    offset += 1
+                    continue
+
                 logging.info("\t- %s", msg.get("id"))
                 await self.delete_msg(
                     msg.get("channel_id"),
                     msg.get("id")
                 )
+
+            messages = (await get_msgs(u_id, me_id, offset)).get("messages")
 
     async def delete_from_all(self, path):
         """
