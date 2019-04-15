@@ -67,8 +67,9 @@ ENDPOINTS = {
 
 class Discord:
     def __init__(self, token):
-        self.token = token
-        self.session = ClientSession(loop=loop)
+        self.session = ClientSession(headers={
+            "Authorization": token
+        })
 
     async def __aenter__(self):
         return self
@@ -76,15 +77,12 @@ class Discord:
     async def __aexit__(self, *args):
         await self.session.close()
 
-    async def _req(self, method, endpoint, body=None):
+    async def _req(self, method, endpoint, **kwargs):
         logging.debug("%s %s", method, endpoint)
 
         url = "{}/{}".format(API, endpoint)
-        headers = { "Authorization": self.token }
 
-        async with self.session.request(method, url, headers=headers,
-                json=body) as resp:
-
+        async with self.session.request(method, url, **kwargs) as resp:
             logging.debug("Got status %d from server.", resp.status)
 
             data = {}
@@ -104,7 +102,7 @@ class Discord:
                 logging.debug("Hit rate limit, waiting for a while.")
                 await asyncio.sleep(delay / 1000)
 
-                return await self._req(method, endpoint, body)
+                return await self._req(method, endpoint, **kwargs)
             # Not Found
             elif resp.status == 404:
                 logging.warning(
@@ -145,7 +143,7 @@ class Discord:
         return await self._req(
             "POST",
             ENDPOINTS["channels"],
-            body={ "recipients": [r_id] }
+            json={ "recipients": [r_id] }
         )
 
     async def guilds(self):
@@ -272,7 +270,7 @@ class Discord:
                     offset += 1
                     continue
 
-                logging.info("\t- %s", msg.get("id"))
+                logging.info("- %s", msg.get("id"))
                 await self.delete_msg(
                     msg.get("channel_id"),
                     msg.get("id")
@@ -336,10 +334,8 @@ class Discord:
 async def main():
     args = parser.parse_args()
 
-    if args.verbose:
-        logging.basicConfig(level=logging.DEBUG)
-    else:
-        logging.basicConfig(level=logging.INFO)
+    level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(level=level)
 
     # TODO: More secure way of passing this value.
     token = os.environ.get("DISCORD_TOKEN")
