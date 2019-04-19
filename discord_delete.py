@@ -4,37 +4,35 @@ import asyncio
 import logging
 import os
 
-from aiohttp import ClientSession
-from argparse import ArgumentParser
-from zipfile import ZipFile, BadZipFile
 from io import StringIO
 from csv import DictReader
+from zipfile import ZipFile, BadZipFile
+from argparse import ArgumentParser
+from aiohttp import ClientSession
 
-parser = ArgumentParser(
+PARSER = ArgumentParser(
     description="Powerful script to delete full Discord message history"
 )
 
-parser.add_argument(
+PARSER.add_argument(
     "-v", "--verbose",
     action="store_true",
     help="enable verbose logging"
 )
 
-subcommand = parser.add_subparsers(
+SUBCOMMAND = PARSER.add_subparsers(
     dest="cmd"
 )
 
-partial = subcommand.add_parser(
+SUBCOMMAND.add_parser(
     "partial",
     help="run a partial message deletion."
 )
 
-full = subcommand.add_parser(
+SUBCOMMAND.add_parser(
     "full",
     help="run a full message deletion using a data request package"
-)
-
-full.add_argument(
+).add_argument(
     "-p", "--package",
     required=True,
     help="path to the data request package."
@@ -45,23 +43,22 @@ LIMIT = 25
 ENDPOINTS = {
     "me":               "/users/@me",
     "relationships":    "/users/@me/relationships",
-    "channels":         "/users/@me/channels",
     "guilds":           "/users/@me/guilds",
     "guild_msgs":       (
-                            "/guilds/{}/messages/search"
-                            "?author_id={}"
-                            "&include_nsfw=true"
-                            "&offset={}"
-                            "&limit={}"
-                        ),
+        "/guilds/{}/messages/search"
+        "?author_id={}"
+        "&include_nsfw=true"
+        "&offset={}"
+        "&limit={}"
+    ),
     "channels":         "/users/@me/channels",
     "channel_msgs":     (
-                            "/channels/{}/messages/search"
-                            "?author_id={}"
-                            "&include_nsfw=true"
-                            "&offset={}"
-                            "&limit={}"
-                        ),
+        "/channels/{}/messages/search"
+        "?author_id={}"
+        "&include_nsfw=true"
+        "&offset={}"
+        "&limit={}"
+    ),
     "delete_msg":       "/channels/{}/messages/{}"
 }
 
@@ -143,7 +140,7 @@ class Discord:
         return await self._req(
             "POST",
             ENDPOINTS["channels"],
-            json={ "recipients": [r_id] }
+            json={"recipients": [r_id]}
         )
 
     async def guilds(self):
@@ -332,7 +329,7 @@ class Discord:
                 await self.delete_msg(c_id, msg)
 
 async def main():
-    args = parser.parse_args()
+    args = PARSER.parse_args()
 
     level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=level)
@@ -352,5 +349,6 @@ async def main():
         if args.cmd == "full":
             await client.delete_from_all(args.package)
 
-loop = asyncio.get_event_loop()
-loop.run_until_complete(main())
+if __name__ == "__main__":
+    LOOP = asyncio.get_event_loop()
+    LOOP.run_until_complete(main())
