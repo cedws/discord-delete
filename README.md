@@ -1,5 +1,5 @@
 # discord-delete
-A script capable of completely deleting Discord message history, even from channels you no longer participate in. Be warned that **using this script could result in the termination of your account**, though I've never had this happen even after extensive usage (see [self-bots](https://support.discordapp.com/hc/en-us/articles/115002192352-Automated-user-accounts-self-bots-)).
+A script capable of deleting Discord message history, ~~even from channels you no longer participate in~~ ([currently investigating](https://github.com/c-edw/discord-delete/issues/11)). Be warned that **using this script could result in the termination of your account**, though I've never had this happen even after extensive usage (see [self-bots](https://support.discordapp.com/hc/en-us/articles/115002192352-Automated-user-accounts-self-bots-)).
 
 This project is vastly more efficient than others (which usually iterate through thousands of messages and hence take an extremely long time) since it intelligently uses undocumented endpoints to track down messages with precision. It keeps the number of API calls to the absolute minimum to reduce the risk of account termination. It's also able to do a deeper search for messages than other projects by using data request packages to delete messages from long-forgotten conversations.
 
