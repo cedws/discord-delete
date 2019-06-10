@@ -29,13 +29,25 @@ SUBCOMMAND.add_parser(
     help="run a partial message deletion."
 )
 
-SUBCOMMAND.add_parser(
+FULL = SUBCOMMAND.add_parser(
     "full",
     help="run a full message deletion using a data request package"
-).add_argument(
+)
+
+FULL.add_argument(
     "-p", "--package",
     required=True,
-    help="path to the data request package."
+    help="path to the data request package"
+)
+
+FULL.add_argument(
+    "-w", "--whitelist",
+    help="whitelist a channel ID for message deletion"
+)
+
+FULL.add_argument(
+    "-b", "--blacklist",
+    help="blacklist a channel ID for message deletion"
 )
 
 API = "https://discordapp.com/api/v6"
@@ -267,7 +279,7 @@ class Discord:
                     offset += 1
                     continue
 
-                logging.info("- %s", msg.get("id"))
+                logging.info("Deleting message %s...", msg.get("id"))
                 await self.delete_msg(
                     msg.get("channel_id"),
                     msg.get("id")
@@ -275,7 +287,7 @@ class Discord:
 
             messages = (await get_msgs(u_id, me_id, offset)).get("messages")
 
-    async def delete_from_all(self, path):
+    async def delete_from_all(self, args):
         """
 
         Delete messages from the user's entire history by using a data request
@@ -283,7 +295,7 @@ class Discord:
 
         """
 
-        if not os.path.exists(path):
+        if not os.path.exists(args.package):
             logging.error(
                 "The specified data request package does not "
                 "exist."
@@ -299,7 +311,7 @@ class Discord:
             return
 
         try:
-            data = ZipFile(path)
+            data = ZipFile(args.package)
         except BadZipFile:
             logging.error(
                 "The specified data request package is invalid "
@@ -318,14 +330,32 @@ class Discord:
             msgs = StringIO(data.read(channel).decode("utf8"))
             reader = DictReader(msgs)
 
-            c_id = channel.split("/")[1]
+            cpath = channel.split("/")
+
+            if len(cpath) < 2:
+                logging.error("Provided ZIP has invalid structure.")
+                return
+
+            c_id = cpath[1]
+
+            if not c_id.isdigit():
+                logging.error("Provided ZIP has invalid structure.")
+                return
+
+            if args.whitelist and c_id != args.whitelist:
+                logging.debug("%s is not whitelisted, skipping...", c_id)
+                continue
+
+            if args.blacklist and c_id == args.blacklist:
+                logging.debug("%s is blacklisted, skipping...", c_id)
+                continue
 
             logging.info("Deleting messages from %s...", c_id)
 
             for line in reader:
                 msg = line["ID"]
 
-                logging.info("\t- %s", msg)
+                logging.info("Deleting message %s...", msg)
                 await self.delete_msg(c_id, msg)
 
 async def main():
@@ -347,7 +377,7 @@ async def main():
         if args.cmd == "partial":
             await client.delete_from_current()
         if args.cmd == "full":
-            await client.delete_from_all(args.package)
+            await client.delete_from_all(args)
 
 if __name__ == "__main__":
     LOOP = asyncio.get_event_loop()
