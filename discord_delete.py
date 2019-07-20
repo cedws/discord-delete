@@ -24,9 +24,19 @@ SUBCOMMAND = PARSER.add_subparsers(
     dest="cmd"
 )
 
-SUBCOMMAND.add_parser(
+PARTIAL = SUBCOMMAND.add_parser(
     "partial",
     help="run a partial message deletion."
+)
+
+PARTIAL.add_argument(
+    "-w", "--whitelist",
+    help="whitelist a channel ID for message deletion"
+)
+
+PARTIAL.add_argument(
+    "-b", "--blacklist",
+    help="blacklist a channel ID for message deletion"
 )
 
 FULL = SUBCOMMAND.add_parser(
@@ -75,10 +85,12 @@ ENDPOINTS = {
 }
 
 class Discord:
-    def __init__(self, token):
+    def __init__(self, token, whitelist, blacklist):
         self.session = ClientSession(headers={
             "Authorization": token
         })
+        self.whitelist = whitelist
+        self.blacklist = blacklist
 
     async def __aenter__(self):
         return self
@@ -259,14 +271,18 @@ class Discord:
     async def delete_from(self, get_msgs, me_id, u_id):
         logging.info("Deleting messages from %s...", u_id)
 
+        if self.whitelist and u_id != self.whitelist:
+            logging.debug("%s is not whitelisted, skipping...", u_id)
+            return
+
+        if self.blacklist and u_id == self.blacklist:
+            logging.debug("%s is blacklisted, skipping...", u_id)
+            return
+
         messages = (await get_msgs(u_id, me_id)).get("messages")
         offset = 0
 
         while messages:
-            # We avoid using the "total_results" field as it is often
-            # inaccurate.
-            logging.debug("Found %d more messages to process.", len(messages))
-
             for context in messages:
                 # The "hit" field is the highlighted message. The other
                 # messages are for context and may not be authored by the
@@ -287,7 +303,7 @@ class Discord:
 
             messages = (await get_msgs(u_id, me_id, offset)).get("messages")
 
-    async def delete_from_all(self, args):
+    async def delete_from_all(self, package):
         """
 
         Delete messages from the user's entire history by using a data request
@@ -295,7 +311,7 @@ class Discord:
 
         """
 
-        if not os.path.exists(args.package):
+        if not os.path.exists(package):
             logging.error(
                 "The specified data request package does not "
                 "exist."
@@ -311,7 +327,7 @@ class Discord:
             return
 
         try:
-            data = ZipFile(args.package)
+            data = ZipFile(package)
         except BadZipFile:
             logging.error(
                 "The specified data request package is invalid "
@@ -342,11 +358,11 @@ class Discord:
                 logging.error("Provided ZIP has invalid structure.")
                 return
 
-            if args.whitelist and c_id != args.whitelist:
+            if self.whitelist and c_id != self.whitelist:
                 logging.debug("%s is not whitelisted, skipping...", c_id)
                 continue
 
-            if args.blacklist and c_id == args.blacklist:
+            if self.blacklist and c_id == self.blacklist:
                 logging.debug("%s is blacklisted, skipping...", c_id)
                 continue
 
@@ -373,11 +389,11 @@ async def main():
         )
         return
 
-    async with Discord(token) as client:
+    async with Discord(token, args.whitelist, args.blacklist) as client:
         if args.cmd == "partial":
             await client.delete_from_current()
         if args.cmd == "full":
-            await client.delete_from_all(args)
+            await client.delete_from_all(args.package)
 
 if __name__ == "__main__":
     LOOP = asyncio.get_event_loop()
