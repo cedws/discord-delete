@@ -10,6 +10,7 @@ import (
 )
 
 const api string = "https://discordapp.com/api/v6"
+const message_limit int = 25
 
 var endpoints map[string]string = map[string]string{
 	"me":            "/users/@me",
@@ -94,30 +95,47 @@ func (c Client) PartialDelete() error {
 }
 
 func (c Client) request(method string, endpoint string, data interface{}) error {
-	url := fmt.Sprintf("%v%v", api, endpoint)
+	url := api + endpoint
 	// TODO: Reuse Client instead of reinitialising it for each call.
 	client := &http.Client{}
 	req, _ := http.NewRequest(method, url, nil)
 	req.Header.Set("Authorization", c.Token)
+
+	log.Logger.Debugf("%v %v", method, url)
+
 	res, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 
+	defer res.Body.Close()
+
 	switch status := res.StatusCode; {
 	case status >= 500:
-		return errors.New("Server sent status 500")
+		return errors.New("Server sent Internal Server Error")
 	case status == 429:
-		data := new(TooManyRequests)
-		json.NewDecoder(res.Body).Decode(&data)
+		var data TooManyRequests
+		err := json.NewDecoder(res.Body).Decode(data)
 		if err != nil {
 			return err
 		}
+		log.Logger.Debugf("Server asked us to sleep for %v milliseconds", data.RetryAfter)
 		time.Sleep(time.Duration(data.RetryAfter) * time.Millisecond)
+		// Try again once we've waited for the period that the server has asked us to.
 		c.request(method, endpoint, data)
+	case status == 403:
+		log.Logger.Info("Server sent Forbidden")
+	case status == 401:
+		return errors.New("Server sent Unauthorized, is your token correct?")
+	case status == 204:
+		break
 	case status == 200:
-		defer res.Body.Close()
-		json.NewDecoder(res.Body).Decode(data)
+		err := json.NewDecoder(res.Body).Decode(data)
+		if err != nil {
+			return err
+		}
+	default:
+		log.Logger.Debugf("Unhandled status code %v", res.StatusCode)
 	}
 
 	return nil
@@ -146,7 +164,7 @@ func (c Client) Channels() ([]Channel, error) {
 }
 
 func (c Client) ChannelMessages(channel Channel, me *Me) (*MessageResults, error) {
-	endpoint := fmt.Sprintf(endpoints["channel_msgs"], channel.ID, me.ID, 0, 25)
+	endpoint := fmt.Sprintf(endpoints["channel_msgs"], channel.ID, me.ID, 0, message_limit)
 	results := new(MessageResults)
 	err := c.request("GET", endpoint, &results)
 	if err != nil {
