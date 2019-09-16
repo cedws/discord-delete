@@ -3,8 +3,10 @@ package discord
 import (
 	"discord-delete/log"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 const api string = "https://discordapp.com/api/v6"
@@ -14,17 +16,17 @@ var endpoints map[string]string = map[string]string{
 	"relationships": "/users/@me/relationships",
 	"guilds":        "/users/@me/guilds",
 	"guild_msgs": "/guilds/{}/messages/search" +
-		"?author_id={}" +
+		"?author_id=%v" +
 		"&include_nsfw=true" +
-		"&offset={}" +
-		"&limit={}",
+		"&offset=%v" +
+		"&limit=%v",
 	"channels": "/users/@me/channels",
 	"channel_msgs": "/channels/%v/messages/search" +
 		"?author_id=%v" +
 		"&include_nsfw=true" +
 		"&offset=%v" +
 		"&limit=%v",
-	"delete_msg": "/channels/{}/messages/{}",
+	"delete_msg": "/channels/%v/messages/%v",
 }
 
 type Client struct {
@@ -32,23 +34,27 @@ type Client struct {
 }
 
 type Me struct {
-	Id string `json:"id"`
+	ID string `json:"id"`
 }
 
 type Channel struct {
-	Id string `json:"id"`
+	ID string `json:"id"`
 }
 
 type Message struct {
-	Id        string `json:"id"`
+	ID        string `json:"id"`
 	Hit       bool   `json:"hit"`
-	ChannelId string `json:"channel_id"`
+	ChannelID string `json:"channel_id"`
 	Type      int    `json:"type"`
 }
 
 type MessageResults struct {
-	TotalResults int         `json:"total_results"`
-	Messages     [][]Message `json:"messages"`
+	TotalResults    int         `json:"total_results"`
+	ContextMessages [][]Message `json:"messages"`
+}
+
+type TooManyRequests struct {
+	RetryAfter int `json:"retry_after"`
 }
 
 func (c Client) PartialDelete() error {
@@ -56,16 +62,21 @@ func (c Client) PartialDelete() error {
 	if err != nil {
 		return err
 	}
+
 	channels, err := c.Channels()
 	if err != nil {
 		return err
 	}
-	for _, elem := range channels {
-		results, err := c.ChannelMessages(elem, me)
+
+	for _, channel := range channels {
+		results, err := c.ChannelMessages(channel, me)
 		if err != nil {
 			return err
 		}
-		for _, ctx := range results.Messages {
+		if len(results.ContextMessages) == 0 {
+			continue
+		}
+		for _, ctx := range results.ContextMessages {
 			for _, msg := range ctx {
 				if !msg.Hit {
 					continue
@@ -73,11 +84,12 @@ func (c Client) PartialDelete() error {
 				if msg.Type != 0 {
 					continue
 				}
-				// TODO: Delete the message.
-				log.Logger.Printf(msg.Id)
+				c.DeleteMessage(channel, msg)
+				log.Logger.Printf(msg.ID)
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -91,8 +103,22 @@ func (c Client) request(method string, endpoint string, data interface{}) error 
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
-	json.NewDecoder(res.Body).Decode(data)
+
+	switch status := res.StatusCode; {
+	case status >= 500:
+		return errors.New("Server sent status 500")
+	case status == 429:
+		data := new(TooManyRequests)
+		json.NewDecoder(res.Body).Decode(&data)
+		if err != nil {
+			return err
+		}
+		time.Sleep(time.Duration(data.RetryAfter) * time.Millisecond)
+		c.request(method, endpoint, data)
+	case status == 200:
+		defer res.Body.Close()
+		json.NewDecoder(res.Body).Decode(data)
+	}
 
 	return nil
 }
@@ -120,7 +146,7 @@ func (c Client) Channels() ([]Channel, error) {
 }
 
 func (c Client) ChannelMessages(channel Channel, me *Me) (*MessageResults, error) {
-	endpoint := fmt.Sprintf(endpoints["channel_msgs"], channel.Id, me.Id, 0, 25)
+	endpoint := fmt.Sprintf(endpoints["channel_msgs"], channel.ID, me.ID, 0, 25)
 	results := new(MessageResults)
 	err := c.request("GET", endpoint, &results)
 	if err != nil {
@@ -128,4 +154,14 @@ func (c Client) ChannelMessages(channel Channel, me *Me) (*MessageResults, error
 	}
 
 	return results, nil
+}
+
+func (c Client) DeleteMessage(channel Channel, msg Message) error {
+	endpoint := fmt.Sprintf(endpoints["delete_msg"], channel.ID, msg.ID)
+	err := c.request("DELETE", endpoint, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
