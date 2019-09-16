@@ -180,7 +180,7 @@ func (c Client) Channels() ([]Channel, error) {
 }
 
 func (c Client) ChannelMessages(channel Channel, me *Me, offset int) (*MessageResults, error) {
-	endpoint := fmt.Sprintf(endpoints["channel_msgs"], channel.ID, me.ID, offset, message_limit)
+	endpoint := fmt.Sprintf(endpoints["channel_msgs"], channel.ID, me.ID, offset, messageLimit)
 	results := new(MessageResults)
 	err := c.request("GET", endpoint, &results)
 	if err != nil {
