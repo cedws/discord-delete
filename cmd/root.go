@@ -13,18 +13,13 @@ var verbose bool
 var rootCmd = &cobra.Command{
 	Use:   "discord-delete",
 	Short: "A tool to delete Discord message history",
-	Run: func(cmd *cobra.Command, args []string) {
-		log.Init(verbose)
-	},
 }
 
 var partialCmd = &cobra.Command{
 	Use: "partial",
 	Run: func(cmd *cobra.Command, args []string) {
+		log.Init(verbose)
 		token := os.Getenv("DISCORD_TOKEN")
-		if token == "" {
-			log.Logger.Fatal("You must specify a Discord auth token by passing DISCORD_TOKEN as an environment variable.")
-		}
 		discord := discord.Client{
 			Token: token,
 		}
