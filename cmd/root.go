@@ -19,11 +19,11 @@ var partialCmd = &cobra.Command{
 	Use: "partial",
 	Run: func(cmd *cobra.Command, args []string) {
 		log.Init(verbose)
+
 		token := os.Getenv("DISCORD_TOKEN")
-		discord := discord.Client{
-			Token: token,
-		}
-		err := discord.PartialDelete()
+		client := discord.New(token)
+
+		err := client.PartialDelete()
 		if err != nil {
 			log.Logger.Fatal(err)
 		}
