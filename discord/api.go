@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"bytes"
 	"discord-delete/log"
 	"encoding/json"
 	"errors"
@@ -35,30 +36,6 @@ type Client struct {
 	HTTPClient http.Client
 }
 
-type Me struct {
-	ID string `json:"id"`
-}
-
-type Channel struct {
-	ID string `json:"id"`
-}
-
-type Message struct {
-	ID        string `json:"id"`
-	Hit       bool   `json:"hit"`
-	ChannelID string `json:"channel_id"`
-	Type      int    `json:"type"`
-}
-
-type MessageResults struct {
-	TotalResults    int         `json:"total_results"`
-	ContextMessages [][]Message `json:"messages"`
-}
-
-type TooManyRequests struct {
-	RetryAfter int `json:"retry_after"`
-}
-
 func New(token string) (c Client) {
 	return Client{
 		Token:      token,
@@ -77,6 +54,31 @@ func (c Client) PartialDelete() error {
 		return err
 	}
 
+	relationships, err := c.Relationships()
+	if err != nil {
+		return err
+	}
+
+Relationships:
+	for _, relation := range relationships {
+		channel, err := c.RelationshipChannel(relation)
+		if err != nil {
+			return err
+		}
+		log.Logger.Debugf("Resolved relationship %v to channel %v", relation.ID, channel.ID)
+
+		for _, c := range channels {
+			if c == *channel {
+				continue Relationships
+			}
+		}
+
+		log.Logger.Debugf("Found hidden relationship channel")
+		channels = append(channels, *channel)
+	}
+
+	log.Logger.Debugf("Finished searching for channels")
+
 	for _, channel := range channels {
 		offset := 0
 
@@ -92,9 +94,15 @@ func (c Client) PartialDelete() error {
 			for _, ctx := range results.ContextMessages {
 				for _, msg := range ctx {
 					if !msg.Hit {
+						// This is a context message which may or may not be authored
+						// by the current user.
+						log.Logger.Debugf("Skipping context message")
 						continue
 					}
 					if msg.Type != 0 {
+						// Only messages of type 0 can be deleted.
+						// An example of a non-zero type message is a call request.
+						log.Logger.Debugf("Found message of non-zero type, incrementing offset")
 						offset++
 						continue
 					}
@@ -108,16 +116,23 @@ func (c Client) PartialDelete() error {
 	return nil
 }
 
-func (c Client) request(method string, endpoint string, data interface{}) error {
+func (c Client) request(method string, endpoint string, reqData interface{}, resData interface{}) error {
 	url := api + endpoint
+	log.Logger.Debugf("%v %v", method, url)
 
-	req, err := http.NewRequest(method, url, nil)
+	buffer := new(bytes.Buffer)
+	if reqData != nil {
+		err := json.NewEncoder(buffer).Encode(reqData)
+		if err != nil {
+			return err
+		}
+	}
+	req, err := http.NewRequest(method, url, buffer)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Authorization", c.Token)
-
-	log.Logger.Debugf("%v %v", method, url)
+	req.Header.Set("Content-Type", "application/json")
 
 	res, err := c.HTTPClient.Do(req)
 	if err != nil {
@@ -127,40 +142,42 @@ func (c Client) request(method string, endpoint string, data interface{}) error 
 	defer res.Body.Close()
 
 	switch status := res.StatusCode; {
-	case status >= 500:
+	case status >= http.StatusInternalServerError:
 		return errors.New("Server sent Internal Server Error")
-	case status == 429:
-		var data TooManyRequests
-		err := json.NewDecoder(res.Body).Decode(data)
+	case status == http.StatusTooManyRequests:
+		var data TooManyRequestsResponse
+		err := json.NewDecoder(res.Body).Decode(resData)
 		if err != nil {
 			return err
 		}
 		log.Logger.Debugf("Server asked us to sleep for %v milliseconds", data.RetryAfter)
 		time.Sleep(time.Duration(data.RetryAfter) * time.Millisecond)
 		// Try again once we've waited for the period that the server has asked us to.
-		return c.request(method, endpoint, data)
-	case status == 403:
+		return c.request(method, endpoint, reqData, resData)
+	case status == http.StatusForbidden:
 		log.Logger.Info("Server sent Forbidden")
-	case status == 401:
+	case status == http.StatusUnauthorized:
 		return errors.New("Server sent Unauthorized, is your token correct?")
-	case status == 204:
+	case status == http.StatusBadRequest:
+		return errors.New("Client sent Bad Request")
+	case status == http.StatusNoContent:
 		break
-	case status == 200:
-		err := json.NewDecoder(res.Body).Decode(data)
+	case status == http.StatusOK:
+		err := json.NewDecoder(res.Body).Decode(resData)
 		if err != nil {
 			return err
 		}
 	default:
-		log.Logger.Debugf("Unhandled status code %v", res.StatusCode)
+		return errors.New(fmt.Sprintf("Server sent unhandled status code %v", res.StatusCode))
 	}
 
 	return nil
 }
 
-func (c Client) Me() (*Me, error) {
+func (c Client) Me() (*MeResponse, error) {
 	endpoint := endpoints["me"]
-	me := new(Me)
-	err := c.request("GET", endpoint, &me)
+	me := new(MeResponse)
+	err := c.request("GET", endpoint, nil, &me)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +188,7 @@ func (c Client) Me() (*Me, error) {
 func (c Client) Channels() ([]Channel, error) {
 	endpoint := endpoints["channels"]
 	var channels []Channel
-	err := c.request("GET", endpoint, &channels)
+	err := c.request("GET", endpoint, nil, &channels)
 	if err != nil {
 		return nil, err
 	}
@@ -179,10 +196,35 @@ func (c Client) Channels() ([]Channel, error) {
 	return channels, nil
 }
 
-func (c Client) ChannelMessages(channel Channel, me *Me, offset int) (*MessageResults, error) {
+func (c Client) RelationshipChannel(relation RelationshipResponse) (*Channel, error) {
+	endpoint := endpoints["channels"]
+	channel := new(Channel)
+	recipients := ChannelRequest{
+		Recipients: []string{relation.ID},
+	}
+	err := c.request("POST", endpoint, recipients, &channel)
+	if err != nil {
+		return nil, err
+	}
+
+	return channel, nil
+}
+
+func (c Client) Relationships() ([]RelationshipResponse, error) {
+	endpoint := endpoints["relationships"]
+	var relations []RelationshipResponse
+	err := c.request("GET", endpoint, nil, &relations)
+	if err != nil {
+		return nil, err
+	}
+
+	return relations, nil
+}
+
+func (c Client) ChannelMessages(channel Channel, me *MeResponse, offset int) (*MessageContextResponse, error) {
 	endpoint := fmt.Sprintf(endpoints["channel_msgs"], channel.ID, me.ID, offset, messageLimit)
-	results := new(MessageResults)
-	err := c.request("GET", endpoint, &results)
+	results := new(MessageContextResponse)
+	err := c.request("GET", endpoint, nil, &results)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +234,7 @@ func (c Client) ChannelMessages(channel Channel, me *Me, offset int) (*MessageRe
 
 func (c Client) DeleteMessage(channel Channel, msg Message) error {
 	endpoint := fmt.Sprintf(endpoints["delete_msg"], channel.ID, msg.ID)
-	err := c.request("DELETE", endpoint, nil)
+	err := c.request("DELETE", endpoint, nil, nil)
 	if err != nil {
 		return err
 	}
