@@ -80,10 +80,10 @@ Relationships:
 	log.Logger.Debugf("Finished searching for channels")
 
 	for _, channel := range channels {
-		offset := 0
+		seek := 0
 
 		for {
-			results, err := c.ChannelMessages(channel, me, offset)
+			results, err := c.ChannelMessages(channel, me, seek)
 			if err != nil {
 				return err
 			}
@@ -91,24 +91,35 @@ Relationships:
 				log.Logger.Infof("No more messages to delete for channel %v", channel.ID)
 				break
 			}
+
+			// TODO: See if we can remove this label.
+ContextMessages:
 			for _, ctx := range results.ContextMessages {
 				for _, msg := range ctx {
-					if !msg.Hit {
-						// This is a context message which may or may not be authored
-						// by the current user.
-						log.Logger.Debugf("Skipping context message")
-						continue
-					}
-					if msg.Type != 0 {
-						// Only messages of type 0 can be deleted.
+					if msg.Hit {
+						// Only messages of type zero can be deleted.
 						// An example of a non-zero type message is a call request.
-						log.Logger.Debugf("Found message of non-zero type, incrementing offset")
-						offset++
-						continue
+						if msg.Type == 0 {
+							log.Logger.Infof("Deleting message %v from channel %v", msg.ID, channel.ID)
+							c.DeleteMessage(channel, msg)
+						} else {
+							log.Logger.Debugf("Found message of non-zero type, incrementing seek index")
+							seek++
+						}
+
+						// We've found the message for this context, we can move on to
+						// the next.
+						continue ContextMessages
 					}
-					log.Logger.Infof("Deleting message %v", msg.ID)
-					c.DeleteMessage(channel, msg)
+
+					// This is a context message which may or may not be authored
+					// by the current user.
+					log.Logger.Debugf("Skipping context message")
 				}
+
+				// We finished iterating the context but didn't find a message
+				// authored by the current user.
+				return errors.New("No hit message present in message context")
 			}
 		}
 	}
@@ -196,18 +207,15 @@ func (c Client) Channels() ([]Channel, error) {
 	return channels, nil
 }
 
-func (c Client) RelationshipChannel(relation RelationshipResponse) (*Channel, error) {
-	endpoint := endpoints["channels"]
-	channel := new(Channel)
-	recipients := ChannelRequest{
-		Recipients: []string{relation.ID},
-	}
-	err := c.request("POST", endpoint, recipients, &channel)
+func (c Client) ChannelMessages(channel Channel, me *MeResponse, seek int) (*MessageContextResponse, error) {
+	endpoint := fmt.Sprintf(endpoints["channel_msgs"], channel.ID, me.ID, seek, messageLimit)
+	results := new(MessageContextResponse)
+	err := c.request("GET", endpoint, nil, &results)
 	if err != nil {
 		return nil, err
 	}
 
-	return channel, nil
+	return results, nil
 }
 
 func (c Client) Relationships() ([]RelationshipResponse, error) {
@@ -221,15 +229,18 @@ func (c Client) Relationships() ([]RelationshipResponse, error) {
 	return relations, nil
 }
 
-func (c Client) ChannelMessages(channel Channel, me *MeResponse, offset int) (*MessageContextResponse, error) {
-	endpoint := fmt.Sprintf(endpoints["channel_msgs"], channel.ID, me.ID, offset, messageLimit)
-	results := new(MessageContextResponse)
-	err := c.request("GET", endpoint, nil, &results)
+func (c Client) RelationshipChannel(relation RelationshipResponse) (*Channel, error) {
+	endpoint := endpoints["channels"]
+	channel := new(Channel)
+	recipients := ChannelRequest{
+		Recipients: []string{relation.ID},
+	}
+	err := c.request("POST", endpoint, recipients, &channel)
 	if err != nil {
 		return nil, err
 	}
 
-	return results, nil
+	return channel, nil
 }
 
 func (c Client) DeleteMessage(channel Channel, msg Message) error {
