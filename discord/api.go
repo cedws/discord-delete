@@ -163,7 +163,7 @@ func (c Client) request(method string, endpoint string, reqData interface{}, res
 		return errors.New("Server sent Internal Server Error")
 	case status == http.StatusTooManyRequests:
 		var data TooManyRequests
-		err := json.NewDecoder(res.Body).Decode(resData)
+		err := json.NewDecoder(res.Body).Decode(data)
 		if err != nil {
 			return err
 		}
