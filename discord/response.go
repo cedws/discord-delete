@@ -1,29 +1,49 @@
 package discord
 
-type MeResponse struct {
-	ID string `json:"id"`
+import (
+	"fmt"
+)
+
+func (c Client) Me() (*Me, error) {
+	endpoint := endpoints["me"]
+	var me Me
+	err := c.request("GET", endpoint, nil, &me)
+	if err != nil {
+		return nil, err
+	}
+
+	return &me, nil
 }
 
-type Channel struct {
-	ID string `json:"id"`
+func (c Client) Channels() ([]Channel, error) {
+	endpoint := endpoints["channels"]
+	var channels []Channel
+	err := c.request("GET", endpoint, nil, &channels)
+	if err != nil {
+		return nil, err
+	}
+
+	return channels, nil
 }
 
-type RelationshipResponse struct {
-	ID string `json:"id"`
+func (c Client) ChannelMessages(channel Channel, me *Me, seek int) (*MessageContext, error) {
+	endpoint := fmt.Sprintf(endpoints["channel_msgs"], channel.ID, me.ID, seek, messageLimit)
+	var results MessageContext
+	err := c.request("GET", endpoint, nil, &results)
+	if err != nil {
+		return nil, err
+	}
+
+	return &results, nil
 }
 
-type Message struct {
-	ID        string `json:"id"`
-	Hit       bool   `json:"hit"`
-	ChannelID string `json:"channel_id"`
-	Type      int    `json:"type"`
-}
+func (c Client) Relationships() ([]Relationship, error) {
+	endpoint := endpoints["relationships"]
+	var relations []Relationship
+	err := c.request("GET", endpoint, nil, &relations)
+	if err != nil {
+		return nil, err
+	}
 
-type MessageContextResponse struct {
-	TotalResults    int         `json:"total_results"`
-	ContextMessages [][]Message `json:"messages"`
-}
-
-type TooManyRequestsResponse struct {
-	RetryAfter int `json:"retry_after"`
+	return relations, nil
 }
