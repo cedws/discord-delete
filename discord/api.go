@@ -61,19 +61,25 @@ func (c Client) PartialDelete() error {
 
 Relationships:
 	for _, relation := range relationships {
-		channel, err := c.RelationshipChannel(relation)
-		if err != nil {
-			return err
-		}
-		log.Logger.Debugf("Resolved relationship %v to channel %v", relation.ID, channel.ID)
-
-		for _, c := range channels {
-			if c == *channel {
+		for _, channel := range channels {
+			if len(channel.Recipients) != 1 {
+				continue Relationships
+			}
+			// If the relation is the sole recipient in one of the channels we found
+			// earlier, skip it.
+			if relation.ID == channel.Recipients[0].ID {
+				log.Logger.Debugf("Skipping relation because the user already has a channel open")
 				continue Relationships
 			}
 		}
 
-		log.Logger.Debugf("Found hidden relationship channel")
+		channel, err := c.ChannelRelationship(relation)
+		if err != nil {
+			return err
+		}
+
+		log.Logger.Debugf("Resolved relationship %v to channel %v", relation.ID, channel.ID)
+
 		channels = append(channels, *channel)
 	}
 
@@ -93,7 +99,7 @@ Relationships:
 			}
 
 			// TODO: See if we can remove this label.
-ContextMessages:
+		ContextMessages:
 			for _, ctx := range results.ContextMessages {
 				for _, msg := range ctx {
 					if msg.Hit {
@@ -156,7 +162,7 @@ func (c Client) request(method string, endpoint string, reqData interface{}, res
 	case status >= http.StatusInternalServerError:
 		return errors.New("Server sent Internal Server Error")
 	case status == http.StatusTooManyRequests:
-		var data TooManyRequestsResponse
+		var data TooManyRequests
 		err := json.NewDecoder(res.Body).Decode(resData)
 		if err != nil {
 			return err
@@ -173,6 +179,8 @@ func (c Client) request(method string, endpoint string, reqData interface{}, res
 		return errors.New("Client sent Bad Request")
 	case status == http.StatusNoContent:
 		break
+	case status == http.StatusAccepted:
+		log.Logger.Info("Server sent Accepted")
 	case status == http.StatusOK:
 		err := json.NewDecoder(res.Body).Decode(resData)
 		if err != nil {
@@ -185,70 +193,31 @@ func (c Client) request(method string, endpoint string, reqData interface{}, res
 	return nil
 }
 
-func (c Client) Me() (*MeResponse, error) {
-	endpoint := endpoints["me"]
-	me := new(MeResponse)
-	err := c.request("GET", endpoint, nil, &me)
-	if err != nil {
-		return nil, err
-	}
-
-	return me, nil
+type Me struct {
+	ID string `json:"id"`
 }
 
-func (c Client) Channels() ([]Channel, error) {
-	endpoint := endpoints["channels"]
-	var channels []Channel
-	err := c.request("GET", endpoint, nil, &channels)
-	if err != nil {
-		return nil, err
-	}
-
-	return channels, nil
+type Channel struct {
+	ID         string         `json:"id"`
+	Recipients []Relationship `json:"recipients"`
 }
 
-func (c Client) ChannelMessages(channel Channel, me *MeResponse, seek int) (*MessageContextResponse, error) {
-	endpoint := fmt.Sprintf(endpoints["channel_msgs"], channel.ID, me.ID, seek, messageLimit)
-	results := new(MessageContextResponse)
-	err := c.request("GET", endpoint, nil, &results)
-	if err != nil {
-		return nil, err
-	}
-
-	return results, nil
+type Relationship struct {
+	ID string `json:"id"`
 }
 
-func (c Client) Relationships() ([]RelationshipResponse, error) {
-	endpoint := endpoints["relationships"]
-	var relations []RelationshipResponse
-	err := c.request("GET", endpoint, nil, &relations)
-	if err != nil {
-		return nil, err
-	}
-
-	return relations, nil
+type Message struct {
+	ID        string `json:"id"`
+	Hit       bool   `json:"hit"`
+	ChannelID string `json:"channel_id"`
+	Type      int    `json:"type"`
 }
 
-func (c Client) RelationshipChannel(relation RelationshipResponse) (*Channel, error) {
-	endpoint := endpoints["channels"]
-	channel := new(Channel)
-	recipients := ChannelRequest{
-		Recipients: []string{relation.ID},
-	}
-	err := c.request("POST", endpoint, recipients, &channel)
-	if err != nil {
-		return nil, err
-	}
-
-	return channel, nil
+type MessageContext struct {
+	TotalResults    int         `json:"total_results"`
+	ContextMessages [][]Message `json:"messages"`
 }
 
-func (c Client) DeleteMessage(channel Channel, msg Message) error {
-	endpoint := fmt.Sprintf(endpoints["delete_msg"], channel.ID, msg.ID)
-	err := c.request("DELETE", endpoint, nil, nil)
-	if err != nil {
-		return err
-	}
-
-	return nil
+type TooManyRequests struct {
+	RetryAfter int `json:"retry_after"`
 }
