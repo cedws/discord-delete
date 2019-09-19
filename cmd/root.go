@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"discord-delete/discord"
-	"discord-delete/log"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"os"
 )
@@ -18,14 +18,16 @@ var rootCmd = &cobra.Command{
 var partialCmd = &cobra.Command{
 	Use: "partial",
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Init(verbose)
+		if verbose {
+			log.SetLevel(log.DebugLevel)
+		}
 
 		token := os.Getenv("DISCORD_TOKEN")
 		client := discord.New(token)
 
 		err := client.PartialDelete()
 		if err != nil {
-			log.Logger.Fatal(err)
+			log.Fatal(err)
 		}
 	},
 }

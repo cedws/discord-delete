@@ -2,10 +2,10 @@ package discord
 
 import (
 	"bytes"
-	"discord-delete/log"
 	"encoding/json"
 	"errors"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"time"
 )
@@ -68,7 +68,7 @@ Relationships:
 			// If the relation is the sole recipient in one of the channels we found
 			// earlier, skip it.
 			if relation.ID == channel.Recipients[0].ID {
-				log.Logger.Debugf("Skipping relation because the user already has a channel open")
+				log.Debugf("Skipping relation because the user already has a channel open")
 				continue Relationships
 			}
 		}
@@ -78,12 +78,12 @@ Relationships:
 			return err
 		}
 
-		log.Logger.Debugf("Resolved relationship %v to channel %v", relation.ID, channel.ID)
+		log.Debugf("Resolved relationship %v to channel %v", relation.ID, channel.ID)
 
 		channels = append(channels, *channel)
 	}
 
-	log.Logger.Debugf("Finished searching for channels")
+	log.Debugf("Finished searching for channels")
 
 	for _, channel := range channels {
 		seek := 0
@@ -94,7 +94,7 @@ Relationships:
 				return err
 			}
 			if len(results.ContextMessages) == 0 {
-				log.Logger.Infof("No more messages to delete for channel %v", channel.ID)
+				log.Infof("No more messages to delete for channel %v", channel.ID)
 				break
 			}
 
@@ -106,10 +106,10 @@ Relationships:
 						// Only messages of type zero can be deleted.
 						// An example of a non-zero type message is a call request.
 						if msg.Type == 0 {
-							log.Logger.Infof("Deleting message %v from channel %v", msg.ID, channel.ID)
+							log.Infof("Deleting message %v from channel %v", msg.ID, channel.ID)
 							c.DeleteMessage(channel, msg)
 						} else {
-							log.Logger.Debugf("Found message of non-zero type, incrementing seek index")
+							log.Debugf("Found message of non-zero type, incrementing seek index")
 							seek++
 						}
 
@@ -120,7 +120,7 @@ Relationships:
 
 					// This is a context message which may or may not be authored
 					// by the current user.
-					log.Logger.Debugf("Skipping context message")
+					log.Debugf("Skipping context message")
 				}
 
 				// We finished iterating the context but didn't find a message
@@ -135,7 +135,7 @@ Relationships:
 
 func (c Client) request(method string, endpoint string, reqData interface{}, resData interface{}) error {
 	url := api + endpoint
-	log.Logger.Debugf("%v %v", method, url)
+	log.Debugf("%v %v", method, url)
 
 	buffer := new(bytes.Buffer)
 	if reqData != nil {
@@ -167,12 +167,12 @@ func (c Client) request(method string, endpoint string, reqData interface{}, res
 		if err != nil {
 			return err
 		}
-		log.Logger.Debugf("Server asked us to sleep for %v milliseconds", data.RetryAfter)
+		log.Debugf("Server asked us to sleep for %v milliseconds", data.RetryAfter)
 		time.Sleep(time.Duration(data.RetryAfter) * time.Millisecond)
 		// Try again once we've waited for the period that the server has asked us to.
 		return c.request(method, endpoint, reqData, resData)
 	case status == http.StatusForbidden:
-		log.Logger.Info("Server sent Forbidden")
+		log.Info("Server sent Forbidden")
 	case status == http.StatusUnauthorized:
 		return errors.New("Server sent Unauthorized, is your token correct?")
 	case status == http.StatusBadRequest:
@@ -180,7 +180,7 @@ func (c Client) request(method string, endpoint string, reqData interface{}, res
 	case status == http.StatusNoContent:
 		break
 	case status == http.StatusAccepted:
-		log.Logger.Info("Server sent Accepted")
+		log.Info("Server sent Accepted")
 	case status == http.StatusOK:
 		err := json.NewDecoder(res.Body).Decode(resData)
 		if err != nil {
