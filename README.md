@@ -7,7 +7,9 @@ A tool for deleting Discord message history. Be warned that **using this tool co
 # Why?
 Discord does not take a strong stance on privacy, unlike many other IM platforms that exist today, such as [Riot](https://about.riot.im/). This is visible from the choices they've made in designing their platform:
 - No end-to-end encryption
-- No built-in ability to delete full message history (not even on account deletion - they will only "anonymise" them)
-- Demanding a mobile phone number from the user, in some case in order to continue using the account
+- No built-in ability to delete full message history (not even on account deletion - they will only "anonymise" the messages)
+- Demanding a mobile phone number from the user, in some cases in order to continue using the account
 - Outright banning the use of alternative clients (which perhaps omit the telemetry that the proprietary client has)
 - Encouraging users to "connect" other profiles, presumably to gain more data about the user
+
+...amongst other egregious infringements on privacy, which you can find a list of [here](https://privacyspy.org/product/discord/).
