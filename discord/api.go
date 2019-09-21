@@ -17,7 +17,7 @@ var endpoints map[string]string = map[string]string{
 	"me":            "/users/@me",
 	"relationships": "/users/@me/relationships",
 	"guilds":        "/users/@me/guilds",
-	"guild_msgs": "/guilds/{}/messages/search" +
+	"guild_msgs": "/guilds/%v/messages/search" +
 		"?author_id=%v" +
 		"&include_nsfw=true" +
 		"&offset=%v" +
@@ -53,6 +53,7 @@ func (c Client) PartialDelete() error {
 	if err != nil {
 		return err
 	}
+	c.DeleteMessages(me, channels, c.ChannelMessages)
 
 	relationships, err := c.Relationships()
 	if err != nil {
@@ -68,7 +69,7 @@ Relationships:
 			// If the relation is the sole recipient in one of the channels we found
 			// earlier, skip it.
 			if relation.ID == channel.Recipients[0].ID {
-				log.Debugf("Skipping relation because the user already has a channel open")
+				log.Debugf("Skipping resolving relation because the user already has the channel open")
 				continue Relationships
 			}
 		}
@@ -80,17 +81,25 @@ Relationships:
 
 		log.Debugf("Resolved relationship %v to channel %v", relation.ID, channel.ID)
 
-		channels = append(channels, *channel)
+		c.DeleteMessages(me, channels, c.ChannelMessages)
 	}
 
-	log.Debugf("Finished searching for channels")
+	guilds, err := c.Guilds()
+	if err != nil {
+		return err
+	}
+	c.DeleteMessages(me, guilds, c.GuildMessages)
 
+	return nil
+}
+
+func (c Client) DeleteMessages(me *Me, channels []Channel, messages func(channel Channel, me *Me, seek int) (*Messages, error)) error {
 	for _, channel := range channels {
 		seek := 0
 
 	ChannelMessages:
 		for {
-			results, err := c.ChannelMessages(channel, me, seek)
+			results, err := messages(channel, me, seek)
 			if err != nil {
 				return err
 			}
@@ -108,7 +117,7 @@ Relationships:
 						// An example of a non-zero type message is a call request.
 						if msg.Type == 0 {
 							log.Infof("Deleting message %v from channel %v", msg.ID, channel.ID)
-							c.DeleteMessage(channel, msg)
+							c.DeleteMessage(msg)
 							continue ChannelMessages
 						} else {
 							log.Debugf("Found message of non-zero type, incrementing seek index")
@@ -215,7 +224,7 @@ type Message struct {
 	Type      int    `json:"type"`
 }
 
-type MessageContext struct {
+type Messages struct {
 	TotalResults    int         `json:"total_results"`
 	ContextMessages [][]Message `json:"messages"`
 }
