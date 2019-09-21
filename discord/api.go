@@ -88,6 +88,7 @@ Relationships:
 	for _, channel := range channels {
 		seek := 0
 
+	ChannelMessages:
 		for {
 			results, err := c.ChannelMessages(channel, me, seek)
 			if err != nil {
@@ -108,14 +109,15 @@ Relationships:
 						if msg.Type == 0 {
 							log.Infof("Deleting message %v from channel %v", msg.ID, channel.ID)
 							c.DeleteMessage(channel, msg)
+							continue ChannelMessages
 						} else {
 							log.Debugf("Found message of non-zero type, incrementing seek index")
 							seek++
-						}
 
-						// We've found the message for this context, we can move on to
-						// the next.
-						continue ContextMessages
+							// We've found the message for this context, we can move on to
+							// the next.
+							continue ContextMessages
+						}
 					}
 
 					// This is a context message which may or may not be authored
