@@ -3,8 +3,8 @@ package discord
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"time"
@@ -46,18 +46,20 @@ func New(token string) (c Client) {
 func (c Client) PartialDelete() error {
 	me, err := c.Me()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Error fetching profile information")
 	}
 
 	channels, err := c.Channels()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Error fetching channels")
 	}
-	c.DeleteMessages(me, channels, c.ChannelMessages)
+	for _, channel := range channels {
+		c.DeleteMessages(me, channel, c.ChannelMessages)
+	}
 
 	relationships, err := c.Relationships()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Error fetching relationships")
 	}
 
 Relationships:
@@ -76,68 +78,72 @@ Relationships:
 
 		channel, err := c.ChannelRelationship(relation)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "Error resolving relationship to channel")
 		}
 
 		log.Debugf("Resolved relationship %v to channel %v", relation.ID, channel.ID)
 
-		c.DeleteMessages(me, channels, c.ChannelMessages)
+		c.DeleteMessages(me, *channel, c.ChannelMessages)
 	}
 
 	guilds, err := c.Guilds()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Error fetching guilds")
 	}
-	c.DeleteMessages(me, guilds, c.GuildMessages)
+	for _, channel := range guilds {
+		c.DeleteMessages(me, channel, c.GuildMessages)
+	}
 
 	return nil
 }
 
-func (c Client) DeleteMessages(me *Me, channels []Channel, messages func(channel Channel, me *Me, seek int) (*Messages, error)) error {
-	for _, channel := range channels {
-		seek := 0
+func (c Client) DeleteMessages(me *Me, channel Channel, messages func(channel Channel, me *Me, seek int) (*Messages, error)) error {
+	seek := 0
 
-	ChannelMessages:
-		for {
-			results, err := messages(channel, me, seek)
-			if err != nil {
-				return err
-			}
-			if len(results.ContextMessages) == 0 {
-				log.Infof("No more messages to delete for channel %v", channel.ID)
-				break
-			}
+ChannelMessages:
+	for {
+		results, err := messages(channel, me, seek)
+		if err != nil {
+			return errors.Wrap(err, "Error fetching messages for channel")
+		}
+		if len(results.ContextMessages) == 0 {
+			log.Infof("No more messages to delete for channel %v", channel.ID)
+			break
+		}
 
-			// TODO: See if we can remove this label.
-		ContextMessages:
-			for _, ctx := range results.ContextMessages {
-				for _, msg := range ctx {
-					if msg.Hit {
-						// Only messages of type zero can be deleted.
-						// An example of a non-zero type message is a call request.
-						if msg.Type == 0 {
-							log.Infof("Deleting message %v from channel %v", msg.ID, channel.ID)
-							c.DeleteMessage(msg)
-							continue ChannelMessages
-						} else {
-							log.Debugf("Found message of non-zero type, incrementing seek index")
-							seek++
+		// TODO: See if we can remove this label.
+	ContextMessages:
+		for _, ctx := range results.ContextMessages {
+			for _, msg := range ctx {
+				if msg.Hit {
+					// Only messages of type zero can be deleted.
+					// An example of a non-zero type message is a call request.
+					if msg.Type == 0 {
+						log.Infof("Deleting message %v from channel %v", msg.ID, channel.ID)
+						c.DeleteMessage(msg)
 
-							// We've found the message for this context, we can move on to
-							// the next.
-							continue ContextMessages
-						}
+						// TODO: Try to remove this. We immediately re-retrieve the message list
+						// after a deletion as a workaround for a bug wherein some messages would
+						// not be deleted. This results in many more requests being made to the server.
+						continue ChannelMessages
+					} else {
+						log.Debugf("Found message of non-zero type, incrementing seek index")
+						seek++
+
+						// We've found the message for this context, we can move on to
+						// the next.
+						continue ContextMessages
 					}
-
-					// This is a context message which may or may not be authored
-					// by the current user.
-					log.Debugf("Skipping context message")
 				}
 
-				// We finished iterating the context but didn't find a message
-				// authored by the current user.
-				return errors.New("No hit message present in message context")
+				// This is a context message which may or may not be authored
+				// by the current user.
+				log.Debugf("Skipping context message")
 			}
+
+			// We finished iterating the context but didn't find a message
+			// authored by the current user.
+			return errors.New("No hit message present in message context")
 		}
 	}
 
@@ -152,50 +158,50 @@ func (c Client) request(method string, endpoint string, reqData interface{}, res
 	if reqData != nil {
 		err := json.NewEncoder(buffer).Encode(reqData)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "Error encoding request data")
 		}
 	}
 	req, err := http.NewRequest(method, url, buffer)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Error building request")
 	}
 	req.Header.Set("Authorization", c.Token)
 	req.Header.Set("Content-Type", "application/json")
 
 	res, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Error sending request")
 	}
 
 	defer res.Body.Close()
 
 	switch status := res.StatusCode; {
 	case status >= http.StatusInternalServerError:
-		return errors.New("Server sent Internal Server Error")
+		return errors.New("Server returned status Internal Server Error")
 	case status == http.StatusTooManyRequests:
 		var data TooManyRequests
 		err := json.NewDecoder(res.Body).Decode(data)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "Error decoding response")
 		}
 		log.Debugf("Server asked us to sleep for %v milliseconds", data.RetryAfter)
 		time.Sleep(time.Duration(data.RetryAfter) * time.Millisecond)
 		// Try again once we've waited for the period that the server has asked us to.
 		return c.request(method, endpoint, reqData, resData)
 	case status == http.StatusForbidden:
-		log.Info("Server sent Forbidden")
+		log.Debug("Server returned status Forbidden")
 	case status == http.StatusUnauthorized:
 		return errors.New("Server sent Unauthorized, is your token correct?")
 	case status == http.StatusBadRequest:
-		return errors.New("Client sent Bad Request")
+		return errors.New("Server returned status Bad Request")
 	case status == http.StatusNoContent:
-		break
+		log.Debug("Server returned status No Content")
 	case status == http.StatusAccepted:
-		log.Info("Server sent Accepted")
+		log.Debug("Server returned status Accepted")
 	case status == http.StatusOK:
 		err := json.NewDecoder(res.Body).Decode(resData)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "Error decoding response")
 		}
 	default:
 		return errors.New(fmt.Sprintf("Server sent unhandled status code %v", res.StatusCode))
@@ -211,6 +217,7 @@ type Me struct {
 type Channel struct {
 	ID         string         `json:"id"`
 	Recipients []Relationship `json:"recipients"`
+	Name       string         `json:"name"`
 }
 
 type Relationship struct {
