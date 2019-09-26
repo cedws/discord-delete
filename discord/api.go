@@ -120,7 +120,10 @@ ChannelMessages:
 					// An example of a non-zero type message is a call request.
 					if msg.Type == 0 {
 						log.Infof("Deleting message %v from channel %v", msg.ID, channel.ID)
-						c.DeleteMessage(msg)
+						err := c.DeleteMessage(msg)
+						if err != nil {
+							return err
+						}
 
 						// TODO: Try to remove this. We immediately re-retrieve the message list
 						// after a deletion as a workaround for a bug wherein some messages would
@@ -179,7 +182,7 @@ func (c Client) request(method string, endpoint string, reqData interface{}, res
 	case status >= http.StatusInternalServerError:
 		return errors.New("Server returned status Internal Server Error")
 	case status == http.StatusTooManyRequests:
-		var data TooManyRequests
+		data := new(TooManyRequests)
 		err := json.NewDecoder(res.Body).Decode(data)
 		if err != nil {
 			return errors.Wrap(err, "Error decoding response")
