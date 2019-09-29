@@ -26,8 +26,8 @@ func (c Client) Channels() ([]Channel, error) {
 	return channels, nil
 }
 
-func (c Client) ChannelMessages(channel Channel, me *Me, seek int) (*Messages, error) {
-	endpoint := fmt.Sprintf(endpoints["channel_msgs"], channel.ID, me.ID, seek, messageLimit)
+func (c Client) ChannelMessages(channel *Channel, me *Me, seek *int) (*Messages, error) {
+	endpoint := fmt.Sprintf(endpoints["channel_msgs"], channel.ID, me.ID, *seek, messageLimit)
 	var results Messages
 	err := c.request("GET", endpoint, nil, &results)
 	if err != nil {
@@ -37,7 +37,7 @@ func (c Client) ChannelMessages(channel Channel, me *Me, seek int) (*Messages, e
 	return &results, nil
 }
 
-func (c Client) ChannelRelationship(relation Relationship) (*Channel, error) {
+func (c Client) ChannelRelationship(relation *Relationship) (*Channel, error) {
 	endpoint := endpoints["channels"]
 	recipients := struct {
 		Recipients []string `json:"recipients"`
@@ -75,8 +75,8 @@ func (c Client) Guilds() ([]Channel, error) {
 	return channels, nil
 }
 
-func (c Client) GuildMessages(channel Channel, me *Me, seek int) (*Messages, error) {
-	endpoint := fmt.Sprintf(endpoints["guild_msgs"], channel.ID, me.ID, seek, messageLimit)
+func (c Client) GuildMessages(channel *Channel, me *Me, seek *int) (*Messages, error) {
+	endpoint := fmt.Sprintf(endpoints["guild_msgs"], channel.ID, me.ID, *seek, messageLimit)
 	var results Messages
 	err := c.request("GET", endpoint, nil, &results)
 	if err != nil {

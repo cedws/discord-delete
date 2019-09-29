@@ -54,7 +54,10 @@ func (c Client) PartialDelete() error {
 		return errors.Wrap(err, "Error fetching channels")
 	}
 	for _, channel := range channels {
-		c.DeleteMessages(me, channel, c.ChannelMessages)
+		err = c.DeleteFromChannel(me, &channel)
+		if err != nil {
+			return err
+		}
 	}
 
 	relationships, err := c.Relationships()
@@ -66,24 +69,27 @@ Relationships:
 	for _, relation := range relationships {
 		for _, channel := range channels {
 			if len(channel.Recipients) != 1 {
-				continue Relationships
+				continue
 			}
 			// If the relation is the sole recipient in one of the channels we found
 			// earlier, skip it.
 			if relation.ID == channel.Recipients[0].ID {
-				log.Debugf("Skipping resolving relation because the user already has the channel open")
+				log.Debugf("Skipping resolving relation %v because the user already has the channel open", relation.ID)
 				continue Relationships
 			}
 		}
 
-		channel, err := c.ChannelRelationship(relation)
+		channel, err := c.ChannelRelationship(&relation)
 		if err != nil {
 			return errors.Wrap(err, "Error resolving relationship to channel")
 		}
 
 		log.Debugf("Resolved relationship %v to channel %v", relation.ID, channel.ID)
 
-		c.DeleteMessages(me, *channel, c.ChannelMessages)
+		err = c.DeleteFromChannel(me, channel)
+		if err != nil {
+			return err
+		}
 	}
 
 	guilds, err := c.Guilds()
@@ -91,18 +97,20 @@ Relationships:
 		return errors.Wrap(err, "Error fetching guilds")
 	}
 	for _, channel := range guilds {
-		c.DeleteMessages(me, channel, c.GuildMessages)
+		err = c.DeleteFromGuild(me, &channel)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func (c Client) DeleteMessages(me *Me, channel Channel, messages func(channel Channel, me *Me, seek int) (*Messages, error)) error {
+func (c Client) DeleteFromChannel(me *Me, channel *Channel) error {
 	seek := 0
 
-ChannelMessages:
 	for {
-		results, err := messages(channel, me, seek)
+		results, err := c.ChannelMessages(channel, me, &seek)
 		if err != nil {
 			return errors.Wrap(err, "Error fetching messages for channel")
 		}
@@ -111,42 +119,60 @@ ChannelMessages:
 			break
 		}
 
-		// TODO: See if we can remove this label.
-	ContextMessages:
-		for _, ctx := range results.ContextMessages {
-			for _, msg := range ctx {
-				if msg.Hit {
-					// Only messages of type zero can be deleted.
-					// An example of a non-zero type message is a call request.
-					if msg.Type == 0 {
-						log.Infof("Deleting message %v from channel %v", msg.ID, channel.ID)
-						err := c.DeleteMessage(msg)
-						if err != nil {
-							return err
-						}
+		err = c.DeleteMessages(results, &seek)
+		if err != nil {
+			return err
+		}
+	}
 
-						// TODO: Try to remove this. We immediately re-retrieve the message list
-						// after a deletion as a workaround for a bug wherein some messages would
-						// not be deleted. This results in many more requests being made to the server.
-						continue ChannelMessages
-					} else {
-						log.Debugf("Found message of non-zero type, incrementing seek index")
-						seek++
+	return nil
+}
 
-						// We've found the message for this context, we can move on to
-						// the next.
-						continue ContextMessages
+func (c Client) DeleteFromGuild(me *Me, channel *Channel) error {
+	seek := 0
+
+	for {
+		results, err := c.GuildMessages(channel, me, &seek)
+		if err != nil {
+			return errors.Wrap(err, "Error fetching messages for guild")
+		}
+		if len(results.ContextMessages) == 0 {
+			log.Infof("No more messages to delete for guild %v ('%v')", channel.ID, channel.Name)
+			break
+		}
+
+		err = c.DeleteMessages(results, &seek)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c Client) DeleteMessages(messages *Messages, seek *int) error {
+	for _, ctx := range messages.ContextMessages {
+		for _, msg := range ctx {
+			if msg.Hit {
+				// Only messages of type zero can be deleted.
+				// An example of a non-zero type message is a call request.
+				if msg.Type == 0 {
+					log.Infof("Deleting message %v from channel %v", msg.ID, msg.ChannelID)
+					err := c.DeleteMessage(&msg)
+					if err != nil {
+						return errors.Wrap(err, "Error deleting message")
 					}
+				} else {
+					log.Debugf("Found message of non-zero type, incrementing seek index")
+					(*seek)++
 				}
 
-				// This is a context message which may or may not be authored
-				// by the current user.
-				log.Debugf("Skipping context message")
+				break
 			}
 
-			// We finished iterating the context but didn't find a message
-			// authored by the current user.
-			return errors.New("No hit message present in message context")
+			// This is a context message which may or may not be authored
+			// by the current user.
+			log.Debugf("Skipping context message")
 		}
 	}
 
@@ -187,7 +213,7 @@ func (c Client) request(method string, endpoint string, reqData interface{}, res
 		if err != nil {
 			return errors.Wrap(err, "Error decoding response")
 		}
-		log.Debugf("Server asked us to sleep for %v milliseconds", data.RetryAfter)
+		log.Infof("Server asked us to sleep for %v milliseconds", data.RetryAfter)
 		time.Sleep(time.Duration(data.RetryAfter) * time.Millisecond)
 		// Try again once we've waited for the period that the server has asked us to.
 		return c.request(method, endpoint, reqData, resData)
