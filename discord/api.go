@@ -201,11 +201,17 @@ func (c Client) request(method string, endpoint string, reqData interface{}, res
 
 	defer res.Body.Close()
 
+	log.Debugf("Server returned status %v", http.StatusText(res.StatusCode))
+
 	switch status := res.StatusCode; {
 	case status >= http.StatusInternalServerError:
-		return errors.New("Server returned status Internal Server Error")
+		return errors.New(fmt.Sprintf("Bad status code %v", http.StatusText(res.StatusCode)))
+	case status == http.StatusAccepted:
+		// Server has sent Accepted because the index hasn't been built yet.
+		// Wait a while until the server is ready.
+		fallthrough
 	case status == http.StatusTooManyRequests:
-		data := new(TooManyRequests)
+		data := new(ServerWait)
 		err := json.NewDecoder(res.Body).Decode(data)
 		if err != nil {
 			return errors.Wrap(err, "Error decoding response")
@@ -215,22 +221,20 @@ func (c Client) request(method string, endpoint string, reqData interface{}, res
 		// Try again once we've waited for the period that the server has asked us to.
 		return c.request(method, endpoint, reqData, resData)
 	case status == http.StatusForbidden:
-		log.Debug("Server returned status Forbidden")
+		break
 	case status == http.StatusUnauthorized:
-		return errors.New("Server sent Unauthorized, is your token correct?")
+		return errors.New(fmt.Sprintf("Bad status code %v, is your token correct?", http.StatusText(res.StatusCode)))
 	case status == http.StatusBadRequest:
-		return errors.New("Server returned status Bad Request")
+		return errors.New(fmt.Sprintf("Bad status code %v", http.StatusText(res.StatusCode)))
 	case status == http.StatusNoContent:
-		log.Debug("Server returned status No Content")
-	case status == http.StatusAccepted:
-		log.Debug("Server returned status Accepted")
+		break
 	case status == http.StatusOK:
 		err := json.NewDecoder(res.Body).Decode(resData)
 		if err != nil {
 			return errors.Wrap(err, "Error decoding response")
 		}
 	default:
-		return errors.New(fmt.Sprintf("Server sent unhandled status code %v", res.StatusCode))
+		return errors.New(fmt.Sprintf("Status code %v is unhandled", http.StatusText(res.StatusCode)))
 	}
 
 	return nil
@@ -278,6 +282,6 @@ type Messages struct {
 	ContextMessages [][]Message `json:"messages"`
 }
 
-type TooManyRequests struct {
+type ServerWait struct {
 	RetryAfter int `json:"retry_after"`
 }
