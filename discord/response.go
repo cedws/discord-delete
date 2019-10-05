@@ -37,7 +37,7 @@ func (c Client) ChannelMessages(channel *Channel, me *Me, seek *int) (*Messages,
 	return &results, nil
 }
 
-func (c Client) ChannelRelationship(relation *Relationship) (*Channel, error) {
+func (c Client) ChannelRelationship(relation *Recipient) (*Channel, error) {
 	endpoint := endpoints["channels"]
 	recipients := struct {
 		Recipients []string `json:"recipients"`

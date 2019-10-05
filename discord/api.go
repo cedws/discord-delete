@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-const api string = "https://discordapp.com/api/v6"
-const messageLimit int = 25
+const api = "https://discordapp.com/api/v6"
+const messageLimit = 25
 
 var endpoints map[string]string = map[string]string{
 	"me":            "/users/@me",
@@ -68,23 +68,20 @@ func (c Client) PartialDelete() error {
 Relationships:
 	for _, relation := range relationships {
 		for _, channel := range channels {
-			if len(channel.Recipients) != 1 {
-				continue
-			}
 			// If the relation is the sole recipient in one of the channels we found
 			// earlier, skip it.
-			if relation.ID == channel.Recipients[0].ID {
+			if channel.Type == PrivateChannel && channel.Recipients[0].ID == relation.ID {
 				log.Debugf("Skipping resolving relation %v because the user already has the channel open", relation.ID)
 				continue Relationships
 			}
 		}
 
-		channel, err := c.ChannelRelationship(&relation)
+		channel, err := c.ChannelRelationship(&relation.Recipient)
 		if err != nil {
 			return errors.Wrap(err, "Error resolving relationship to channel")
 		}
 
-		log.Debugf("Resolved relationship %v to channel %v", relation.ID, channel.ID)
+		log.Infof("Resolved relationship with '%v' to channel %v", relation.Recipient.Username, channel.ID)
 
 		err = c.DeleteFromChannel(me, channel)
 		if err != nil {
@@ -137,7 +134,7 @@ func (c Client) DeleteFromGuild(me *Me, channel *Channel) error {
 			return errors.Wrap(err, "Error fetching messages for guild")
 		}
 		if len(results.ContextMessages) == 0 {
-			log.Infof("No more messages to delete for guild %v ('%v')", channel.ID, channel.Name)
+			log.Infof("No more messages to delete for guild '%v'", channel.Name)
 			break
 		}
 
@@ -154,9 +151,9 @@ func (c Client) DeleteMessages(messages *Messages, seek *int) error {
 	for _, ctx := range messages.ContextMessages {
 		for _, msg := range ctx {
 			if msg.Hit {
-				// Only messages of type zero can be deleted.
-				// An example of a non-zero type message is a call request.
-				if msg.Type == 0 {
+				// The message might be an action rather than text. Actions aren't deletable.
+				// An example of an action is a call request.
+				if msg.Type == UserMessage {
 					log.Infof("Deleting message %v from channel %v", msg.ID, msg.ChannelID)
 					err := c.DeleteMessage(&msg)
 					if err != nil {
@@ -239,23 +236,39 @@ func (c Client) request(method string, endpoint string, reqData interface{}, res
 	return nil
 }
 
+const (
+	UserMessage = 0
+)
+
+const (
+	PrivateChannel = 1
+)
+
 type Me struct {
 	ID string `json:"id"`
 }
 
 type Channel struct {
-	ID         string         `json:"id"`
-	Recipients []Relationship `json:"recipients"`
-	Name       string         `json:"name"`
+	Type       int         `json:"type"`
+	ID         string      `json:"id"`
+	Recipients []Recipient `json:"recipients"`
+	Name       string      `json:"name,omitempty"`
+}
+
+type Recipient struct {
+	Username string `json:"username"`
+	ID       string `json:"id"`
 }
 
 type Relationship struct {
-	ID string `json:"id"`
+	Type      int       `json:"type"`
+	ID        string    `json:"id"`
+	Recipient Recipient `json:"user"`
 }
 
 type Message struct {
 	ID        string `json:"id"`
-	Hit       bool   `json:"hit"`
+	Hit       bool   `json:"hit,omitempty"`
 	ChannelID string `json:"channel_id"`
 	Type      int    `json:"type"`
 }
