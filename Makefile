@@ -1,5 +1,6 @@
 BIN_DIR=bin
 BIN_NAME=discord-delete
+GOFLAGS=-trimpath
 
 all: clean build
 
@@ -9,10 +10,10 @@ clean:
 build: build-linux build-darwin build-windows
 
 build-linux:
-	GOOS=linux GOARCH=amd64 go build -o $(BIN_DIR)/$(BIN_NAME)-linux
+	GOOS=linux GOARCH=amd64 go build $(GOFLAGS) -o $(BIN_DIR)/$(BIN_NAME)-linux
 
 build-darwin:
-	GOOS=darwin GOARCH=amd64 go build -o $(BIN_DIR)/$(BIN_NAME)-darwin
+	GOOS=darwin GOARCH=amd64 go build $(GOFLAGS) -o $(BIN_DIR)/$(BIN_NAME)-darwin
 
 build-windows:
-	GOOS=windows GOARCH=amd64 go build -o $(BIN_DIR)/$(BIN_NAME)-windows
+	GOOS=windows GOARCH=amd64 go build $(GOFLAGS) -o $(BIN_DIR)/$(BIN_NAME)-windows
