@@ -149,7 +149,6 @@ func (c Client) DeleteFromGuild(me *Me, channel *Channel) error {
 		// any messages to delete.
 		if len(results.ContextMessages) == 0 {
 			seek += messageLimit
-			log.Infof("%+v", results)
 			if seek >= results.TotalResults {
 				log.Infof("No more messages to delete for guild '%v'", channel.Name)
 				break
