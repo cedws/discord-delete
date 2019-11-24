@@ -111,9 +111,18 @@ func (c Client) DeleteFromChannel(me *Me, channel *Channel) error {
 		if err != nil {
 			return errors.Wrap(err, "Error fetching messages for channel")
 		}
+
+		// As of some date ~24-11-19, Discord's API doesn't move messages down the 'stack'
+		// as they are deleted, and instead returns an empty array.
+		// Hence, we have to iterate over all pages to determine whether or not there are
+		// any messages to delete.
 		if len(results.ContextMessages) == 0 {
-			log.Infof("No more messages to delete for channel %v", channel.ID)
-			break
+			seek += messageLimit
+			if seek >= results.TotalResults {
+				log.Infof("No more messages to delete for channel %v", channel.ID)
+				break
+			}
+			continue
 		}
 
 		err = c.DeleteMessages(results, &seek)
@@ -133,9 +142,19 @@ func (c Client) DeleteFromGuild(me *Me, channel *Channel) error {
 		if err != nil {
 			return errors.Wrap(err, "Error fetching messages for guild")
 		}
+
+		// As of some date ~24-11-19, Discord's API doesn't move messages down the 'stack'
+		// as they are deleted, and instead returns an empty array.
+		// Hence, we have to iterate over all pages to determine whether or not there are
+		// any messages to delete.
 		if len(results.ContextMessages) == 0 {
-			log.Infof("No more messages to delete for guild '%v'", channel.Name)
-			break
+			seek += messageLimit
+			log.Infof("%+v", results)
+			if seek >= results.TotalResults {
+				log.Infof("No more messages to delete for guild '%v'", channel.Name)
+				break
+			}
+			continue
 		}
 
 		err = c.DeleteMessages(results, &seek)
@@ -160,9 +179,10 @@ func (c Client) DeleteMessages(messages *Messages, seek *int) error {
 						return errors.Wrap(err, "Error deleting message")
 					}
 				} else {
-					log.Debugf("Found message of non-zero type, incrementing seek index")
-					(*seek)++
+					log.Debugf("Skipping message of non-zero type")
 				}
+
+				(*seek)++
 
 				break
 			}
