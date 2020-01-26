@@ -1,4 +1,4 @@
-package discord
+package client
 
 import (
 	"bytes"
@@ -32,18 +32,19 @@ var endpoints map[string]string = map[string]string{
 }
 
 type Client struct {
-	Token      string
-	HTTPClient http.Client
+	deletedCount int
+	token        string
+	httpClient   http.Client
 }
 
 func New(token string) (c Client) {
 	return Client{
-		Token:      token,
-		HTTPClient: http.Client{},
+		token:      token,
+		httpClient: http.Client{},
 	}
 }
 
-func (c Client) PartialDelete() error {
+func (c *Client) PartialDelete() error {
 	me, err := c.Me()
 	if err != nil {
 		return errors.Wrap(err, "Error fetching profile information")
@@ -100,10 +101,12 @@ Relationships:
 		}
 	}
 
+	log.Infof("Finished deleting messages: %v deleted", c.deletedCount)
+
 	return nil
 }
 
-func (c Client) DeleteFromChannel(me *Me, channel *Channel) error {
+func (c *Client) DeleteFromChannel(me *Me, channel *Channel) error {
 	seek := 0
 
 	for {
@@ -125,7 +128,7 @@ func (c Client) DeleteFromChannel(me *Me, channel *Channel) error {
 	return nil
 }
 
-func (c Client) DeleteFromGuild(me *Me, channel *Channel) error {
+func (c *Client) DeleteFromGuild(me *Me, channel *Channel) error {
 	seek := 0
 
 	for {
@@ -147,7 +150,7 @@ func (c Client) DeleteFromGuild(me *Me, channel *Channel) error {
 	return nil
 }
 
-func (c Client) DeleteMessages(messages *Messages, seek *int) error {
+func (c *Client) DeleteMessages(messages *Messages, seek *int) error {
 	for _, ctx := range messages.ContextMessages {
 		for _, msg := range ctx {
 			if msg.Hit {
@@ -159,6 +162,7 @@ func (c Client) DeleteMessages(messages *Messages, seek *int) error {
 					if err != nil {
 						return errors.Wrap(err, "Error deleting message")
 					}
+					c.deletedCount++
 				} else {
 					log.Debugf("Found message of non-zero type, incrementing seek index")
 					(*seek)++
@@ -176,7 +180,7 @@ func (c Client) DeleteMessages(messages *Messages, seek *int) error {
 	return nil
 }
 
-func (c Client) request(method string, endpoint string, reqData interface{}, resData interface{}) error {
+func (c *Client) request(method string, endpoint string, reqData interface{}, resData interface{}) error {
 	url := api + endpoint
 	log.Debugf("%v %v", method, url)
 
@@ -191,10 +195,10 @@ func (c Client) request(method string, endpoint string, reqData interface{}, res
 	if err != nil {
 		return errors.Wrap(err, "Error building request")
 	}
-	req.Header.Set("Authorization", c.Token)
+	req.Header.Set("Authorization", c.token)
 	req.Header.Set("Content-Type", "application/json")
 
-	res, err := c.HTTPClient.Do(req)
+	res, err := c.httpClient.Do(req)
 	if err != nil {
 		return errors.Wrap(err, "Error sending request")
 	}

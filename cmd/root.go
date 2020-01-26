@@ -1,7 +1,8 @@
 package cmd
 
 import (
-	"discord-delete/discord"
+	"discord-delete/client"
+	"discord-delete/client/token"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -22,10 +23,21 @@ var partialCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		token := os.Getenv("DISCORD_TOKEN")
-		client := discord.New(token)
+		var tok string
+		var err error
 
-		err := client.PartialDelete()
+		tok, def := os.LookupEnv("DISCORD_TOKEN")
+
+		if !def {
+			tok, err = token.GetToken()
+			if err != nil {
+				log.Debug(err)
+				log.Fatal("Error retrieving token, pass DISCORD_TOKEN as an environment variable instead")
+			}
+		}
+
+		client := client.New(tok)
+		err = client.PartialDelete()
 		if err != nil {
 			log.Fatal(err)
 		}
