@@ -1,6 +1,10 @@
 # discord-delete
 A tool for deleting Discord message history. Be warned that **using this tool could result in the termination of your account**, though I've never had this happen even after extensive usage (see [self-bots](https://support.discordapp.com/hc/en-us/articles/115002192352-Automated-user-accounts-self-bots-)). The tool tries to interact with Discord's API efficiently to reduce the chance of this happening.
 
+# Features
+- Fast and efficient deletions
+- Automatic token retrieval (currently for Windows only)
+
 # Usage
 - [Running a partial deletion](https://github.com/adversarialtools/discord-delete/wiki/Running-a-partial-deletion)
 
