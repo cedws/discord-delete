@@ -1,4 +1,4 @@
-//+build windows
+//+build linux
 
 package token
 
@@ -13,11 +13,11 @@ import (
 )
 
 func GetToken() (string, error) {
-	appdata, def := os.LookupEnv("APPDATA")
+	home, def := os.LookupEnv("HOME")
 	if !def {
-		return "", errors.New("APPDATA path wasn't specified in environment")
+		return "", errors.New("HOME path wasn't specified in environment")
 	}
-	path := filepath.Join(appdata, "Discord/Local Storage/leveldb")
+	path := filepath.Join(home, ".config/discord/Local Storage/leveldb")
 
 	db, err := leveldb.OpenFile(path, &opt.Options{
 		ReadOnly: true,

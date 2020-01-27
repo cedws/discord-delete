@@ -1,4 +1,4 @@
-//+build !windows
+//+build !windows,!linux
 
 package token
 
@@ -7,5 +7,5 @@ import (
 )
 
 func GetToken() (string, error) {
-	return "", errors.New("Token retrieval only currently supported for Windows")
+	return "", errors.New("Token retrieval not supported on this platform yet")
 }
