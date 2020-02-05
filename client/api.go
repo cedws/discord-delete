@@ -33,6 +33,7 @@ var endpoints map[string]string = map[string]string{
 
 type Client struct {
 	deletedCount int
+	requestCount int
 	token        string
 	httpClient   http.Client
 }
@@ -101,7 +102,7 @@ Relationships:
 		}
 	}
 
-	log.Infof("Finished deleting messages: %v deleted", c.deletedCount)
+	log.Infof("Finished deleting messages: %v deleted in %v total requests", c.deletedCount, c.requestCount)
 
 	return nil
 }
@@ -202,6 +203,8 @@ func (c *Client) request(method string, endpoint string, reqData interface{}, re
 	if err != nil {
 		return errors.Wrap(err, "Error sending request")
 	}
+
+	c.requestCount++
 
 	defer res.Body.Close()
 
