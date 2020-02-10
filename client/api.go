@@ -206,7 +206,12 @@ func (c *Client) request(method string, endpoint string, reqData interface{}, re
 
 	c.requestCount++
 
-	defer res.Body.Close()
+	defer func() {
+		err := res.Body.Close()
+		if err != nil {
+			log.Fatal(errors.Wrap(err, "Error closing Body"))
+		}
+	}()
 
 	log.Debugf("Server returned status %v", http.StatusText(res.StatusCode))
 

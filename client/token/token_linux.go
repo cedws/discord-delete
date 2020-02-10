@@ -8,11 +8,9 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strconv"
 )
 
-func GetToken() (string, error) {
+func GetToken() (tok string, err error) {
 	home, def := os.LookupEnv("HOME")
 	if !def {
 		return "", errors.New("HOME path wasn't specified in environment")
@@ -25,19 +23,16 @@ func GetToken() (string, error) {
 	if err != nil {
 		return "", errors.Wrap(err, "Couldn't open database")
 	}
-	defer db.Close()
+	defer func() {
+		err = errors.Wrap(db.Close(), "Error closing database")
+	}()
 
 	data, err := db.Get([]byte(tokenKey), nil)
 	if err != nil {
 		return "", errors.Wrap(err, "Couldn't retrieve token from database")
 	}
 
-	// TODO: Try to improve this expression or use capture groups.
-	reg := regexp.MustCompile("\"(.*?)\"")
-	token, err := strconv.Unquote(string(reg.Find(data)))
-	if err != nil {
-		return "", errors.Wrap(err, "Couldn't parse token")
-	}
+	tok, err = parseToken(string(data))
 
-	return token, nil
+	return
 }
