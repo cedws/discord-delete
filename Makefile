@@ -20,3 +20,5 @@ build-darwin:
 
 build-windows:
 	GOOS=windows GOARCH=amd64 go build $(GOFLAGS) -o $(BIN_DIR)/$(BIN_NAME)-windows.exe
+
+.PHONY: clean test build build-linux build-darwin build-windows
