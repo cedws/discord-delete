@@ -8,7 +8,7 @@ clean:
 	rm -rf $(BIN_DIR)
 
 test:
-	go test ./...
+	go test -failfast -race ./...
 
 build: build-linux build-darwin build-windows
 
