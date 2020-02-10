@@ -2,10 +2,13 @@ BIN_DIR=bin
 BIN_NAME=discord-delete
 GOFLAGS=-trimpath
 
-all: clean build
+all: clean test build
 
 clean:
 	rm -rf $(BIN_DIR)
+
+test:
+	go test ./...
 
 build: build-linux build-darwin build-windows
 
