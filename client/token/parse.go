@@ -6,7 +6,7 @@ import (
 )
 
 func parseToken(data string) (string, error) {
-	reg := regexp.MustCompile(`"(mfa.*)"`)
+	reg := regexp.MustCompile(`"(.*)"`)
 	match := reg.FindStringSubmatch(data)
 	if len(match) < 1 {
 		return "", errors.New("Token doesn't seem valid")

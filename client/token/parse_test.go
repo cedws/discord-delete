@@ -11,15 +11,8 @@ func TestUnquotedBadToken(t *testing.T) {
 	}
 }
 
-func TestUnprefixedBadToken(t *testing.T) {
-	_, err := parseToken(`DEAD"BEEF"`)
-	if err == nil {
-		t.Fatal("Token was invalid but error was nil")
-	}
-}
-
 func TestPrefixedGoodToken(t *testing.T) {
-	_, err := parseToken(`DEAD"mfa.BEEF"`)
+	_, err := parseToken(`DEAD"BEEF"`)
 	if err != nil {
 		t.Fatal("Token was valid but error was returned")
 	}
