@@ -152,6 +152,11 @@ func (c *Client) DeleteFromGuild(me *Me, channel *Channel) error {
 }
 
 func (c *Client) DeleteMessages(messages *Messages, seek *int) error {
+	// Milliseconds to wait between deleting messages
+	// A delay which is too short will cause the server to return 429 and force us to wait a while
+	// By preempting the server's delay, we can reduce the number of requests made to the server
+	const minSleep = 200
+
 	for _, ctx := range messages.ContextMessages {
 		for _, msg := range ctx {
 			if msg.Hit {
@@ -164,6 +169,7 @@ func (c *Client) DeleteMessages(messages *Messages, seek *int) error {
 						return errors.Wrap(err, "Error deleting message")
 					}
 					c.deletedCount++
+					time.Sleep(minSleep * time.Millisecond)
 				} else {
 					log.Debugf("Found message of non-zero type, incrementing seek index")
 					(*seek)++
