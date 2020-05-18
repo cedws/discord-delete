@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const api = "https://discordapp.com/api/v6"
+const api = "https://discord.com/api/v6"
 const messageLimit = 25
 
 var endpoints map[string]string = map[string]string{
