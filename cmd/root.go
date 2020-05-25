@@ -10,6 +10,7 @@ import (
 )
 
 var verbose bool
+var dryrun bool
 
 var rootCmd = &cobra.Command{
 	Use:   "discord-delete",
@@ -37,6 +38,8 @@ var partialCmd = &cobra.Command{
 		}
 
 		client := client.New(tok)
+		client.SetDryRun(dryrun)
+
 		err = client.PartialDelete()
 		if err != nil {
 			log.Fatal(err)
@@ -45,6 +48,8 @@ var partialCmd = &cobra.Command{
 }
 
 func init() {
+	partialCmd.Flags().BoolVarP(&dryrun, "dry-run", "d", false, "perform dry run without deleting anything")
+
 	rootCmd.AddCommand(partialCmd)
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose logging")
 }

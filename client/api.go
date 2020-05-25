@@ -34,6 +34,7 @@ var endpoints = map[string]string{
 type Client struct {
 	deletedCount int
 	requestCount int
+	dryRun       bool
 	token        string
 	httpClient   http.Client
 }
@@ -43,6 +44,10 @@ func New(token string) (c Client) {
 		token:      token,
 		httpClient: http.Client{},
 	}
+}
+
+func (c *Client) SetDryRun(dryRun bool) {
+	c.dryRun = dryRun
 }
 
 func (c *Client) PartialDelete() error {
@@ -164,12 +169,18 @@ func (c *Client) DeleteMessages(messages *Messages, seek *int) error {
 				// An example of an action is a call request.
 				if msg.Type == UserMessage {
 					log.Infof("Deleting message %v from channel %v", msg.ID, msg.ChannelID)
-					err := c.DeleteMessage(&msg)
-					if err != nil {
-						return errors.Wrap(err, "Error deleting message")
+					if c.dryRun {
+						// Move seek index forward to simulate message deletion on server's side
+						(*seek)++
+					} else {
+						err := c.DeleteMessage(&msg)
+						if err != nil {
+							return errors.Wrap(err, "Error deleting message")
+						}
+						time.Sleep(minSleep * time.Millisecond)
 					}
+					// Increment regardless of whether it's a dry run
 					c.deletedCount++
-					time.Sleep(minSleep * time.Millisecond)
 				} else {
 					log.Debugf("Found message of non-zero type, incrementing seek index")
 					(*seek)++
