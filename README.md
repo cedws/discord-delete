@@ -3,7 +3,8 @@ A tool for deleting Discord message history. Be warned that **using this tool co
 
 # Features
 - Fast and efficient deletions
-- Automatic token retrieval (currently for Windows only)
+- Automatic token retrieval from Discord Client (currently for Windows and Linux only)
+- Dry run mode
 
 # Usage
 - [Running a partial deletion](https://github.com/adversarialtools/discord-delete/wiki/Running-a-partial-deletion)
