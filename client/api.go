@@ -13,7 +13,7 @@ import (
 const api = "https://discord.com/api/v6"
 const messageLimit = 25
 
-var endpoints map[string]string = map[string]string{
+var endpoints = map[string]string{
 	"me":            "/users/@me",
 	"relationships": "/users/@me/relationships",
 	"guilds":        "/users/@me/guilds",
