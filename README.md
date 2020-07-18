@@ -10,7 +10,7 @@ A tool for deleting Discord message history. Be warned that **using this tool co
 - [Running a partial deletion](https://github.com/adversarialtools/discord-delete/wiki/Running-a-partial-deletion)
 
 # Why?
-Discord does not take a strong stance on privacy, unlike many other IM platforms that exist today, such as [Riot](https://about.riot.im/). This is visible from the choices they've made in designing their platform:
+Discord does not take a strong stance on privacy, unlike many other IM platforms that exist today, such as [Element](https://element.io/). This is visible from the choices they've made in designing their platform:
 - No end-to-end encryption
 - No built-in ability to delete full message history (not even on account deletion - they will only "anonymise" the messages)
 - Demanding a mobile phone number from the user, in some cases in order to continue using the account
