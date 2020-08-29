@@ -6,6 +6,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"regexp"
+	"strconv"
 )
 
 // Discord moved to https://discord.com as of some time around May 2020
@@ -44,7 +45,7 @@ func searchLevelDB(path string) (tok string, err error) {
 	}()
 
 	for _, key := range tokenKeys {
-		log.Debugf("Looking for token under key %v", key)
+		log.Debugf("Looking for token under key %v", strconv.Quote(key))
 
 		data, err := db.Get([]byte(key), nil)
 		// Ignore if token is empty
