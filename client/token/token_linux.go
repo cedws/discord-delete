@@ -4,6 +4,7 @@ package token
 
 import (
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
 )
