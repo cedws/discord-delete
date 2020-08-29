@@ -13,7 +13,19 @@ func GetToken() (tok string, err error) {
 	if !def {
 		return "", errors.New("HOME path wasn't specified in environment")
 	}
-	path := filepath.Join(home, ".config/discord/Local Storage/leveldb")
 
-	return searchLevelDB(path)
+	versions := []string{"discord", "discordcanary", "discordptb"}
+
+	for _, ver := range versions {
+		path := filepath.Join(home, ".config", ver, "Local Storage/leveldb")
+		log.Debugf("Searching for LevelDB database in %v", path)
+
+		tok, err = searchLevelDB(path)
+		if err == nil {
+			return
+		}
+	}
+
+	err = errors.New("Failed to retrieve token from database")
+	return
 }

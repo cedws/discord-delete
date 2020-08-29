@@ -4,6 +4,7 @@ package token
 
 import (
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
 )
@@ -13,7 +14,19 @@ func GetToken() (tok string, err error) {
 	if !def {
 		return "", errors.New("APPDATA path wasn't specified in environment")
 	}
-	path := filepath.Join(appdata, "Discord/Local Storage/leveldb")
 
-	return searchLevelDB(path)
+	versions := []string{"Discord", "discordcanary", "discordptb"}
+
+	for _, ver := range versions {
+		path := filepath.Join(appdata, ver, "Local Storage/leveldb")
+		log.Debugf("Searching for LevelDB database in %v", path)
+
+		tok, err = searchLevelDB(path)
+		if err == nil {
+			return
+		}
+	}
+
+	err = errors.New("Failed to retrieve token from database")
+	return
 }
