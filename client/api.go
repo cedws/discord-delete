@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const api = "https://discord.com/api/v6"
+const api = "https://discord.com/api/v8"
 const messageLimit = 25
 
 var endpoints = map[string]string{
@@ -245,14 +245,15 @@ func (c *Client) request(method string, endpoint string, reqData interface{}, re
 		if err != nil {
 			return errors.Wrap(err, "Error decoding response")
 		}
-		log.Infof("Server asked us to sleep for %v milliseconds", data.RetryAfter)
-		time.Sleep(time.Duration(data.RetryAfter) * time.Millisecond)
+		millis := time.Duration(data.RetryAfter*1000) * time.Millisecond
+		log.Infof("Server asked us to sleep for %v", millis)
+		time.Sleep(millis)
 		// Try again once we've waited for the period that the server has asked us to.
 		return c.request(method, endpoint, reqData, resData)
 	case status == http.StatusForbidden:
 		break
 	case status == http.StatusUnauthorized:
-		return errors.New(fmt.Sprintf("Bad status code %v, is your token correct?", http.StatusText(res.StatusCode)))
+		return errors.New(fmt.Sprintf("Bad status code %v, log out and log back in to Discord or verify your token is correct", http.StatusText(res.StatusCode)))
 	case status == http.StatusBadRequest:
 		return errors.New(fmt.Sprintf("Bad status code %v", http.StatusText(res.StatusCode)))
 	case status == http.StatusNoContent:
@@ -312,5 +313,5 @@ type Messages struct {
 }
 
 type ServerWait struct {
-	RetryAfter int `json:"retry_after"`
+	RetryAfter float32 `json:"retry_after"`
 }
