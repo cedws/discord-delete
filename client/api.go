@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"net/http"
@@ -36,6 +37,7 @@ type Client struct {
 	requestCount int
 	dryRun       bool
 	token        string
+	channels	 []string
 	httpClient   http.Client
 }
 
@@ -48,6 +50,20 @@ func New(token string) (c Client) {
 
 func (c *Client) SetDryRun(dryRun bool) {
 	c.dryRun = dryRun
+}
+
+func (c *Client) SetChannels(channels string) {
+	c.channels = strings.Fields(channels)
+}
+
+func (c *Client) SkipChannel(channel string) bool {
+	for _, channel_ := range c.channels {
+		if channel_ == channel {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (c *Client) PartialDelete() error {
@@ -169,7 +185,7 @@ func (c *Client) DeleteMessages(messages *Messages, seek *int) error {
 				// An example of an action is a call request.
 				if msg.Type == UserMessage {
 					log.Infof("Deleting message %v from channel %v", msg.ID, msg.ChannelID)
-					if c.dryRun {
+					if c.dryRun || c.SkipChannel(msg.ChannelID) {
 						// Move seek index forward to simulate message deletion on server's side
 						(*seek)++
 					} else {
