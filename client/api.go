@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -37,7 +37,7 @@ type Client struct {
 	requestCount int
 	dryRun       bool
 	token        string
-	channels	 []string
+	channels     []string
 	httpClient   http.Client
 }
 
