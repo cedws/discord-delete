@@ -77,9 +77,11 @@ func (c *Client) PartialDelete() error {
 		return errors.Wrap(err, "Error fetching channels")
 	}
 	for _, channel := range channels {
-		err = c.DeleteFromChannel(me, &channel)
-		if err != nil {
-			return err
+		if !c.SkipChannel(channel.ID) {
+			err = c.DeleteFromChannel(me, &channel)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -185,7 +187,7 @@ func (c *Client) DeleteMessages(messages *Messages, seek *int) error {
 				// An example of an action is a call request.
 				if msg.Type == UserMessage {
 					log.Infof("Deleting message %v from channel %v", msg.ID, msg.ChannelID)
-					if c.dryRun || c.SkipChannel(msg.ChannelID) {
+					if c.dryRun {
 						// Move seek index forward to simulate message deletion on server's side
 						(*seek)++
 					} else {
