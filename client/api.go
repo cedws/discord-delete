@@ -119,9 +119,11 @@ Relationships:
 		return errors.Wrap(err, "Error fetching guilds")
 	}
 	for _, channel := range guilds {
-		err = c.DeleteFromGuild(me, &channel)
-		if err != nil {
-			return err
+		if !c.SkipChannel(channel.ID) {
+			err = c.DeleteFromGuild(me, &channel)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
