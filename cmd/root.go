@@ -52,7 +52,7 @@ var partialCmd = &cobra.Command{
 
 func init() {
 	partialCmd.Flags().BoolVarP(&dryrun, "dry-run", "d", false, "perform dry run without deleting anything")
-	partialCmd.Flags().StringVarP(&channels, "skip-channel", "s", "", "skip message deletion for specified channels")
+	partialCmd.Flags().StringVarP(&channels, "skip", "s", "", "skip message deletion for specified channels")
 
 
 	rootCmd.AddCommand(partialCmd)
