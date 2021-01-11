@@ -58,7 +58,8 @@ func (c *Client) SetChannels(channels string) {
 
 func (c *Client) SkipChannel(channel string) bool {
 	for _, channel_ := range c.channels {
-		if channel_ == channel {
+		if channel == channel_ {
+			log.Debugf("Skipping message deletion for channel/guild %v", channel)
 			return true
 		}
 	}
@@ -187,7 +188,7 @@ func (c *Client) DeleteMessages(messages *Messages, seek *int) error {
 			if msg.Hit {
 				// The message might be an action rather than text. Actions aren't deletable.
 				// An example of an action is a call request.
-				if msg.Type == UserMessage {
+				if msg.Type == UserMessage && !c.SkipChannel(msg.ChannelID) {
 					log.Infof("Deleting message %v from channel %v", msg.ID, msg.ChannelID)
 					if c.dryRun {
 						// Move seek index forward to simulate message deletion on server's side
