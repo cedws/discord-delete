@@ -109,9 +109,11 @@ Relationships:
 
 		log.Infof("Resolved relationship with '%v' to channel %v", relation.Recipient.Username, channel.ID)
 
-		err = c.DeleteFromChannel(me, channel)
-		if err != nil {
-			return err
+		if !c.SkipChannel(channel.ID) {
+			err = c.DeleteFromChannel(me, channel)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
