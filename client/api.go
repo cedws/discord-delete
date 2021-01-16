@@ -18,6 +18,7 @@ var endpoints = map[string]string{
 	"me":            "/users/@me",
 	"relationships": "/users/@me/relationships",
 	"guilds":        "/users/@me/guilds",
+	"guild_channels": "/guilds/%v/channels",
 	"guild_msgs": "/guilds/%v/messages/search" +
 		"?author_id=%v" +
 		"&include_nsfw=true" +
@@ -59,7 +60,7 @@ func (c *Client) SetChannels(channels string) {
 func (c *Client) SkipChannel(channel string) bool {
 	for _, channel_ := range c.channels {
 		if channel == channel_ {
-			log.Debugf("Skipping message deletion for channel/guild %v", channel)
+			log.Infof("Skipping message deletion for channel/guild %v", channel)
 			return true
 		}
 	}
