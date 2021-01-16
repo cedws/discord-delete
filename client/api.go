@@ -191,7 +191,7 @@ func (c *Client) DeleteMessages(messages *Messages, seek *int) error {
 			if msg.Hit {
 				// The message might be an action rather than text. Actions aren't deletable.
 				// An example of an action is a call request.
-				if msg.Type == UserMessage && !c.SkipChannel(msg.ChannelID) {
+				if msg.Type == UserMessage {
 					log.Infof("Deleting message %v from channel %v", msg.ID, msg.ChannelID)
 					if c.dryRun {
 						// Move seek index forward to simulate message deletion on server's side
