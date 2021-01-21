@@ -15,9 +15,9 @@ const api = "https://discord.com/api/v6"
 const messageLimit = 25
 
 var endpoints = map[string]string{
-	"me":            "/users/@me",
-	"relationships": "/users/@me/relationships",
-	"guilds":        "/users/@me/guilds",
+	"me":             "/users/@me",
+	"relationships":  "/users/@me/relationships",
+	"guilds":         "/users/@me/guilds",
 	"guild_channels": "/guilds/%v/channels",
 	"guild_msgs": "/guilds/%v/messages/search" +
 		"?author_id=%v" +
@@ -58,8 +58,8 @@ func (c *Client) SetChannels(channels string) {
 }
 
 func (c *Client) SkipChannel(channel string) bool {
-	for _, channel_ := range c.channels {
-		if channel == channel_ {
+	for _, ChannelCmp := range c.channels {
+		if channel == ChannelCmp {
 			log.Infof("Skipping message deletion for channel/guild %v", channel)
 			return true
 		}
