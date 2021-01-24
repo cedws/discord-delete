@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -14,9 +15,10 @@ const api = "https://discord.com/api/v6"
 const messageLimit = 25
 
 var endpoints = map[string]string{
-	"me":            "/users/@me",
-	"relationships": "/users/@me/relationships",
-	"guilds":        "/users/@me/guilds",
+	"me":             "/users/@me",
+	"relationships":  "/users/@me/relationships",
+	"guilds":         "/users/@me/guilds",
+	"guild_channels": "/guilds/%v/channels",
 	"guild_msgs": "/guilds/%v/messages/search" +
 		"?author_id=%v" +
 		"&include_nsfw=true" +
@@ -36,6 +38,7 @@ type Client struct {
 	requestCount int
 	dryRun       bool
 	token        string
+	channels     []string
 	httpClient   http.Client
 }
 
@@ -50,6 +53,21 @@ func (c *Client) SetDryRun(dryRun bool) {
 	c.dryRun = dryRun
 }
 
+func (c *Client) SetChannels(channels string) {
+	c.channels = strings.Fields(channels)
+}
+
+func (c *Client) SkipChannel(channel string) bool {
+	for _, ChannelCmp := range c.channels {
+		if channel == ChannelCmp {
+			log.Infof("Skipping message deletion for channel/guild %v", channel)
+			return true
+		}
+	}
+
+	return false
+}
+
 func (c *Client) PartialDelete() error {
 	me, err := c.Me()
 	if err != nil {
@@ -61,9 +79,11 @@ func (c *Client) PartialDelete() error {
 		return errors.Wrap(err, "Error fetching channels")
 	}
 	for _, channel := range channels {
-		err = c.DeleteFromChannel(me, &channel)
-		if err != nil {
-			return err
+		if !c.SkipChannel(channel.ID) {
+			err = c.DeleteFromChannel(me, &channel)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -90,9 +110,11 @@ Relationships:
 
 		log.Infof("Resolved relationship with '%v' to channel %v", relation.Recipient.Username, channel.ID)
 
-		err = c.DeleteFromChannel(me, channel)
-		if err != nil {
-			return err
+		if !c.SkipChannel(channel.ID) {
+			err = c.DeleteFromChannel(me, channel)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -101,9 +123,11 @@ Relationships:
 		return errors.Wrap(err, "Error fetching guilds")
 	}
 	for _, channel := range guilds {
-		err = c.DeleteFromGuild(me, &channel)
-		if err != nil {
-			return err
+		if !c.SkipChannel(channel.ID) {
+			err = c.DeleteFromGuild(me, &channel)
+			if err != nil {
+				return err
+			}
 		}
 	}
 

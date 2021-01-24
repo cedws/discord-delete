@@ -76,11 +76,26 @@ func (c *Client) Guilds() ([]Channel, error) {
 }
 
 func (c *Client) GuildMessages(channel *Channel, me *Me, seek *int) (*Messages, error) {
-	endpoint := fmt.Sprintf(endpoints["guild_msgs"], channel.ID, me.ID, *seek, messageLimit)
+	endpointMsgs := fmt.Sprintf(endpoints["guild_msgs"], channel.ID, me.ID, *seek, messageLimit)
+	endpointChannels := fmt.Sprintf(endpoints["guild_channels"], channel.ID)
+
+	var channels []Me
 	var results Messages
-	err := c.request("GET", endpoint, nil, &results)
-	if err != nil {
-		return nil, err
+
+	errChannels := c.request("GET", endpointChannels, nil, &channels)
+	if errChannels != nil {
+		return nil, errChannels
+	}
+
+	for _, channel := range channels {
+		if !c.SkipChannel(channel.ID) {
+			endpointMsgs = fmt.Sprintf("%v&channel_id=%v", endpointMsgs, channel.ID)
+		}
+	}
+
+	errMsgs := c.request("GET", endpointMsgs, nil, &results)
+	if errMsgs != nil {
+		return nil, errMsgs
 	}
 
 	return &results, nil
