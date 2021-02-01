@@ -11,7 +11,7 @@ import (
 
 var verbose bool
 var dryrun bool
-var channels string
+var skipChannels []string
 
 var rootCmd = &cobra.Command{
 	Use:   "discord-delete",
@@ -41,7 +41,7 @@ var partialCmd = &cobra.Command{
 		client := client.New(tok)
 
 		client.SetDryRun(dryrun)
-		client.SetChannels(channels)
+		client.SetSkipChannels(skipChannels)
 
 		err = client.PartialDelete()
 		if err != nil {
@@ -52,7 +52,7 @@ var partialCmd = &cobra.Command{
 
 func init() {
 	partialCmd.Flags().BoolVarP(&dryrun, "dry-run", "d", false, "perform dry run without deleting anything")
-	partialCmd.Flags().StringVarP(&channels, "skip", "s", "", "skip message deletion for specified channels/guilds")
+	partialCmd.Flags().StringSliceVarP(&skipChannels, "skip", "s", []string{}, "skip message deletion for specified channels/guilds")
 
 	rootCmd.AddCommand(partialCmd)
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose logging")
