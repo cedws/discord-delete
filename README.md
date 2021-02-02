@@ -17,4 +17,4 @@ Discord does not take a strong stance on privacy, unlike many other IM platforms
 - Outright banning the use of alternative clients (which perhaps omit the telemetry that the proprietary client has)
 - Encouraging users to "connect" other profiles, presumably to gain more data about the user
 
-...amongst other egregious infringements on privacy, which you can find a list of [here](https://privacyspy.org/product/discord/).
+...amongst other egregious infringements on privacy, which you can find a list of [here](https://privacyspy.org/product/discord/) and [here](https://cadence.moe/blog/2020-06-06-why-you-shouldnt-trust-discord).
