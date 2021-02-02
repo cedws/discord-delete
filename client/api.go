@@ -114,8 +114,13 @@ Relationships:
 	if err != nil {
 		return errors.Wrap(err, "Error fetching guilds")
 	}
-	for _, channel := range guilds {
-		err = c.DeleteFromGuild(me, &channel)
+	for _, guild := range guilds {
+		if c.skipChannel(guild.ID) {
+			log.Infof("Skipping message deletion for guild '%v'", guild.Name)
+			continue
+		}
+
+		err = c.DeleteFromGuild(me, &guild)
 		if err != nil {
 			return err
 		}
