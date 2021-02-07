@@ -1,15 +1,16 @@
 # discord-delete
 A tool for deleting Discord message history. Be warned that **using this tool could result in the termination of your account**, though I've never had this happen even after extensive usage (see [self-bots](https://support.discordapp.com/hc/en-us/articles/115002192352-Automated-user-accounts-self-bots-)). The tool tries to interact with Discord's API efficiently to reduce the chance of this happening.
 
-# Features
+## Features
 - Fast and efficient deletions
 - Automatic token retrieval from Discord Client (currently for Windows and Linux only)
 - Dry run mode
 
-# Usage
+## Usage
 - [Running a partial deletion](https://github.com/adversarialtools/discord-delete/wiki/Running-a-partial-deletion)
+- [Skipping specific channels](https://github.com/adversarialtools/discord-delete/wiki/Skipping-specific-channels)
 
-# Why?
+## Why?
 Discord does not take a strong stance on privacy, unlike many other IM platforms that exist today, such as [Matrix](https://matrix.org/). This is visible from the choices they've made in designing their platform:
 - No end-to-end encryption
 - No built-in ability to delete full message history (not even on account deletion - they will only "anonymise" the messages)
