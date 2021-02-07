@@ -7,7 +7,6 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -38,7 +37,7 @@ type Client struct {
 	requestCount int
 	dryRun       bool
 	token        string
-	channels     []string
+	skipChannels []string
 	httpClient   http.Client
 }
 
@@ -53,19 +52,8 @@ func (c *Client) SetDryRun(dryRun bool) {
 	c.dryRun = dryRun
 }
 
-func (c *Client) SetChannels(channels string) {
-	c.channels = strings.Fields(channels)
-}
-
-func (c *Client) SkipChannel(channel string) bool {
-	for _, ChannelCmp := range c.channels {
-		if channel == ChannelCmp {
-			log.Infof("Skipping message deletion for channel/guild %v", channel)
-			return true
-		}
-	}
-
-	return false
+func (c *Client) SetSkipChannels(skipChannels []string) {
+	c.skipChannels = skipChannels
 }
 
 func (c *Client) PartialDelete() error {
@@ -78,12 +66,16 @@ func (c *Client) PartialDelete() error {
 	if err != nil {
 		return errors.Wrap(err, "Error fetching channels")
 	}
+
 	for _, channel := range channels {
-		if !c.SkipChannel(channel.ID) {
-			err = c.DeleteFromChannel(me, &channel)
-			if err != nil {
-				return err
-			}
+		if c.skipChannel(channel.ID) {
+			log.Infof("Skipping message deletion for channel %v", channel.ID)
+			continue
+		}
+
+		err = c.DeleteFromChannel(me, &channel)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -110,7 +102,7 @@ Relationships:
 
 		log.Infof("Resolved relationship with '%v' to channel %v", relation.Recipient.Username, channel.ID)
 
-		if !c.SkipChannel(channel.ID) {
+		if !c.skipChannel(channel.ID) {
 			err = c.DeleteFromChannel(me, channel)
 			if err != nil {
 				return err
@@ -122,12 +114,15 @@ Relationships:
 	if err != nil {
 		return errors.Wrap(err, "Error fetching guilds")
 	}
-	for _, channel := range guilds {
-		if !c.SkipChannel(channel.ID) {
-			err = c.DeleteFromGuild(me, &channel)
-			if err != nil {
-				return err
-			}
+	for _, guild := range guilds {
+		if c.skipChannel(guild.ID) {
+			log.Infof("Skipping message deletion for guild '%v'", guild.Name)
+			continue
+		}
+
+		err = c.DeleteFromGuild(me, &guild)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -187,29 +182,11 @@ func (c *Client) DeleteMessages(messages *Messages, seek *int) error {
 	const minSleep = 200
 
 	for _, ctx := range messages.ContextMessages {
+		var hit *Message
+
 		for _, msg := range ctx {
 			if msg.Hit {
-				// The message might be an action rather than text. Actions aren't deletable.
-				// An example of an action is a call request.
-				if msg.Type == UserMessage {
-					log.Infof("Deleting message %v from channel %v", msg.ID, msg.ChannelID)
-					if c.dryRun {
-						// Move seek index forward to simulate message deletion on server's side
-						(*seek)++
-					} else {
-						err := c.DeleteMessage(&msg)
-						if err != nil {
-							return errors.Wrap(err, "Error deleting message")
-						}
-						time.Sleep(minSleep * time.Millisecond)
-					}
-					// Increment regardless of whether it's a dry run
-					c.deletedCount++
-				} else {
-					log.Debugf("Found message of non-zero type, incrementing seek index")
-					(*seek)++
-				}
-
+				hit = &msg
 				break
 			}
 
@@ -217,9 +194,55 @@ func (c *Client) DeleteMessages(messages *Messages, seek *int) error {
 			// by the current user.
 			log.Debugf("Skipping context message")
 		}
+
+		if hit != nil {
+			// The message might be an action rather than text. Actions aren't deletable.
+			// An example of an action is a call request.
+			if hit.Type != UserMessage {
+				log.Debugf("Found message of non-zero type, incrementing seek index")
+				(*seek)++
+				continue
+			}
+
+			// Check if this message is in our list of channels to skip
+			// This will only skip this specific message and increment the seek index
+			// Entire channels should be skipped at the caller of this function
+			// We do it this way because we search guilds returns a mix of messages from
+			// any channel
+			if c.skipChannel(hit.ChannelID) {
+				log.Infof("Skipping message deletion for channel %v", hit.ChannelID)
+				(*seek)++
+				continue
+			}
+
+			log.Infof("Deleting message %v from channel %v", hit.ID, hit.ChannelID)
+			if c.dryRun {
+				// Move seek index forward to simulate message deletion on server's side
+				(*seek)++
+			} else {
+				err := c.DeleteMessage(hit)
+				if err != nil {
+					return errors.Wrap(err, "Error deleting message")
+				}
+				time.Sleep(minSleep * time.Millisecond)
+			}
+			// Increment regardless of whether it's a dry run
+			c.deletedCount++
+
+			break
+		}
 	}
 
 	return nil
+}
+
+func (c *Client) skipChannel(channel string) bool {
+	for _, skip := range c.skipChannels {
+		if channel == skip {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Client) request(method string, endpoint string, reqData interface{}, resData interface{}) error {
