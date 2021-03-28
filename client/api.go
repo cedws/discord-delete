@@ -68,11 +68,6 @@ func (c *Client) PartialDelete() error {
 	}
 
 	for _, channel := range channels {
-		if c.skipChannel(channel.ID) {
-			log.Infof("Skipping message deletion for channel %v", channel.ID)
-			continue
-		}
-
 		err = c.DeleteFromChannel(me, &channel)
 		if err != nil {
 			return err
@@ -102,11 +97,9 @@ Relationships:
 
 		log.Infof("Resolved relationship with '%v' to channel %v", relation.Recipient.Username, channel.ID)
 
-		if !c.skipChannel(channel.ID) {
-			err = c.DeleteFromChannel(me, channel)
-			if err != nil {
-				return err
-			}
+		err = c.DeleteFromChannel(me, channel)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -115,11 +108,6 @@ Relationships:
 		return errors.Wrap(err, "Error fetching guilds")
 	}
 	for _, guild := range guilds {
-		if c.skipChannel(guild.ID) {
-			log.Infof("Skipping message deletion for guild '%v'", guild.Name)
-			continue
-		}
-
 		err = c.DeleteFromGuild(me, &guild)
 		if err != nil {
 			return err
@@ -132,6 +120,11 @@ Relationships:
 }
 
 func (c *Client) DeleteFromChannel(me *Me, channel *Channel) error {
+	if c.skipChannel(channel.ID) {
+		log.Infof("Skipping message deletion for channel %v", channel.ID)
+		return nil
+	}
+
 	seek := 0
 
 	for {
@@ -154,6 +147,11 @@ func (c *Client) DeleteFromChannel(me *Me, channel *Channel) error {
 }
 
 func (c *Client) DeleteFromGuild(me *Me, channel *Channel) error {
+	if c.skipChannel(channel.ID) {
+		log.Infof("Skipping message deletion for guild '%v'", channel.Name)
+		return nil
+	}
+
 	seek := 0
 
 	for {
@@ -207,8 +205,8 @@ func (c *Client) DeleteMessages(messages *Messages, seek *int) error {
 			// Check if this message is in our list of channels to skip
 			// This will only skip this specific message and increment the seek index
 			// Entire channels should be skipped at the caller of this function
-			// We do it this way because we search guilds returns a mix of messages from
-			// any channel
+			// We do it this way because guilds searches return a mix of messages
+			// from any channel
 			if c.skipChannel(hit.ChannelID) {
 				log.Infof("Skipping message deletion for channel %v", hit.ChannelID)
 				(*seek)++
