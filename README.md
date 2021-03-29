@@ -1,5 +1,8 @@
 # discord-delete
-A tool for deleting Discord message history. Be warned that **using this tool could result in the termination of your account**, though I've never had this happen even after extensive usage (see [self-bots](https://support.discordapp.com/hc/en-us/articles/115002192352-Automated-user-accounts-self-bots-)). The tool tries to interact with Discord's API efficiently to reduce the chance of this happening.
+A tool for deleting Discord message history.
+
+>:warning: **Any tool for deleting messages, including this one, could result in the termination of your account** (see [self-bots](https://support.discordapp.com/hc/en-us/articles/115002192352-Automated-user-accounts-self-bots-)).
+>Discord appears to have recently started cracking down on self-bots.
 
 ## Features
 - Fast and efficient deletions
