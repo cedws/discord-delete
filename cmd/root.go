@@ -25,6 +25,9 @@ var partialCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		log.Warn("Any tool that deletes your messages, including this one, could result in the termination of your account")
+		log.Warn("You have been warned!")
+
 		var tok string
 		var err error
 
