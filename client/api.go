@@ -183,23 +183,17 @@ func (c *Client) DeleteMessages(messages *Messages, seek *int) error {
 	const minSleep = 200
 
 	for _, ctx := range messages.ContextMessages {
-		var hit *Message
-
 		for _, msg := range ctx {
-			if msg.Hit {
-				hit = &msg
-				break
+			if !msg.Hit {
+				// This is a context message which may or may not be authored
+				// by the current user
+				log.Debugf("Skipping context message")
+				continue
 			}
 
-			// This is a context message which may or may not be authored
-			// by the current user.
-			log.Debugf("Skipping context message")
-		}
-
-		if hit != nil {
 			// The message might be an action rather than text. Actions aren't deletable.
 			// An example of an action is a call request.
-			if hit.Type != UserMessage {
+			if msg.Type != UserMessage {
 				log.Debugf("Found message of non-zero type, incrementing seek index")
 				(*seek)++
 				continue
@@ -210,18 +204,18 @@ func (c *Client) DeleteMessages(messages *Messages, seek *int) error {
 			// Entire channels should be skipped at the caller of this function
 			// We do it this way because guilds searches return a mix of messages
 			// from any channel
-			if c.skipChannel(hit.ChannelID) {
-				log.Infof("Skipping message deletion for channel %v", hit.ChannelID)
+			if c.skipChannel(msg.ChannelID) {
+				log.Infof("Skipping message deletion for channel %v", msg.ChannelID)
 				(*seek)++
 				continue
 			}
 
-			log.Infof("Deleting message %v from channel %v", hit.ID, hit.ChannelID)
+			log.Infof("Deleting message %v from channel %v", msg.ID, msg.ChannelID)
 			if c.dryRun {
 				// Move seek index forward to simulate message deletion on server's side
 				(*seek)++
 			} else {
-				err := c.DeleteMessage(hit)
+				err := c.DeleteMessage(&msg)
 				if err != nil {
 					return errors.Wrap(err, "Error deleting message")
 				}
@@ -229,8 +223,6 @@ func (c *Client) DeleteMessages(messages *Messages, seek *int) error {
 			}
 			// Increment regardless of whether it's a dry run
 			c.deletedCount++
-
-			break
 		}
 	}
 
