@@ -1,8 +1,8 @@
 package client
 
 import (
-	"discord-delete/client/spoof"
 	"bytes"
+	"discord-delete/client/spoof"
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
@@ -38,7 +38,7 @@ type Client struct {
 	requestCount int
 	dryRun       bool
 	token        string
-	superProps   string
+	spoof        spoof.Info
 	skipChannels []string
 	httpClient   http.Client
 }
@@ -46,7 +46,7 @@ type Client struct {
 func New(token string) (c Client) {
 	return Client{
 		token:      token,
-		superProps: spoof.RandomSuperProps(),
+		spoof:      spoof.RandomInfo(),
 		httpClient: http.Client{},
 	}
 }
@@ -262,7 +262,8 @@ func (c *Client) request(method string, endpoint string, reqData interface{}, re
 		return errors.Wrap(err, "Error building request")
 	}
 	req.Header.Set("Authorization", c.token)
-	req.Header.Set("X-Super-Properties", c.superProps)
+	req.Header.Set("X-Super-Properties", c.spoof.SuperProps)
+	req.Header.Set("User-Agent", c.spoof.UserAgent)
 	req.Header.Set("Content-Type", "application/json")
 
 	res, err := c.httpClient.Do(req)
