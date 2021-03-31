@@ -284,28 +284,29 @@ func (c *Client) request(method string, endpoint string, reqData interface{}, re
 
 	switch status := res.StatusCode; {
 	case status >= http.StatusInternalServerError:
-		return errors.New(fmt.Sprintf("Bad status code %v", http.StatusText(res.StatusCode)))
+		return fmt.Errorf("Bad status code %v", http.StatusText(res.StatusCode))
 	case status == http.StatusAccepted:
-		// Server has sent Accepted because the index hasn't been built yet.
-		// Wait a while until the server is ready.
-		fallthrough
-	case status == http.StatusTooManyRequests:
-		data := new(ServerWait)
-		err := json.NewDecoder(res.Body).Decode(data)
+		// retry_after is an integer in milliseconds
+		err := c.wait(res, 1)
 		if err != nil {
-			return errors.Wrap(err, "Error decoding response")
+			return err
 		}
-		millis := time.Duration(data.RetryAfter*1000) * time.Millisecond
-		log.Infof("Server asked us to sleep for %v", millis)
-		time.Sleep(millis)
+		// Try again once we've waited for the period that the server has asked us to.
+		return c.request(method, endpoint, reqData, resData)
+	case status == http.StatusTooManyRequests:
+		// retry_after is a float in seconds
+		err := c.wait(res, 1000)
+		if err != nil {
+			return err
+		}
 		// Try again once we've waited for the period that the server has asked us to.
 		return c.request(method, endpoint, reqData, resData)
 	case status == http.StatusForbidden:
 		break
 	case status == http.StatusUnauthorized:
-		return errors.New(fmt.Sprintf("Bad status code %v, log out and log back in to Discord or verify your token is correct", http.StatusText(res.StatusCode)))
+		return fmt.Errorf("Bad status code %v, log out and log back in to Discord or verify your token is correct", http.StatusText(res.StatusCode))
 	case status == http.StatusBadRequest:
-		return errors.New(fmt.Sprintf("Bad status code %v", http.StatusText(res.StatusCode)))
+		return fmt.Errorf("Bad status code %v", http.StatusText(res.StatusCode))
 	case status == http.StatusNoContent:
 		break
 	case status == http.StatusOK:
@@ -314,8 +315,23 @@ func (c *Client) request(method string, endpoint string, reqData interface{}, re
 			return errors.Wrap(err, "Error decoding response")
 		}
 	default:
-		return errors.New(fmt.Sprintf("Status code %v is unhandled", http.StatusText(res.StatusCode)))
+		return fmt.Errorf("Status code %v is unhandled", http.StatusText(res.StatusCode))
 	}
+
+	return nil
+}
+
+func (c *Client) wait(res *http.Response, mult int) error {
+	data := new(ServerWait)
+	err := json.NewDecoder(res.Body).Decode(data)
+	if err != nil {
+		return errors.Wrap(err, "Error decoding response")
+	}
+
+	// Multiply retry_after by the mult passed in
+	millis := time.Duration(data.RetryAfter*float32(mult)) * time.Millisecond
+	log.Infof("Server asked us to sleep for %v", millis)
+	time.Sleep(millis)
 
 	return nil
 }
