@@ -1,0 +1,20 @@
+name: CI
+on: 
+  push:
+    tags:
+    - '*'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checking out repository..."
+        uses: 'actions/checkout@v2'
+      - name: "Building..."
+        run: make
+      - name: "Publishing GitHub release from tag..."
+        uses: 'ncipollo/release-action@v1'
+        with:
+          artifacts: "bin/*"
+          allowUpdates: true
+          replacesArtifacts: true
+          token: ${{ secrets.GH_TOKEN }}
