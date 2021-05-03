@@ -1,9 +1,0 @@
-image: freebsd/latest
-packages:
-  - go
-sources:
-  - https://github.com/adversarialtools/discord-delete
-tasks:
-  - build: |
-      cd discord-delete
-      make
