@@ -26,18 +26,17 @@ func parseToken(data string) (string, error) {
 	reg := regexp.MustCompile(`"(.*)"`)
 	match := reg.FindStringSubmatch(data)
 	if len(match) < 1 {
-		return "", errors.New("Token doesn't seem valid")
+		return "", ErrorTokenInvalid
 	}
 	return match[1], nil
 }
 
-func searchLevelDB(path string) (tok string, err error) {
+func searchLevelDB(path string) (string, error) {
 	db, err := leveldb.OpenFile(path, &opt.Options{
 		ReadOnly: true,
 	})
 	if err != nil {
-		err = errors.Wrap(err, "Couldn't open database")
-		return
+		return "", errors.Wrap(err, "Couldn't open database")
 	}
 	defer func() {
 		// Drop error, we don't care if this fails
@@ -56,6 +55,5 @@ func searchLevelDB(path string) (tok string, err error) {
 		return parseToken(string(data))
 	}
 
-	err = errors.New("Failed to retrieve token from database")
-	return
+	return "", ErrorTokenRetrieve
 }

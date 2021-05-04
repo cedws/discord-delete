@@ -1,26 +1,21 @@
 package token
 
 import (
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestUnquotedBadToken(t *testing.T) {
 	_, err := parseToken(`DEADBEEF`)
-	if err == nil {
-		t.Fatal("Token was invalid but error was nil")
-	}
+	assert.NotNil(t, err)
 }
 
 func TestPrefixedGoodToken(t *testing.T) {
 	_, err := parseToken(`DEAD"BEEF"`)
-	if err != nil {
-		t.Fatal("Token was valid but error was returned")
-	}
+	assert.Nil(t, err)
 }
 
 func TestParsedToken(t *testing.T) {
 	tok, _ := parseToken(`DEAD"mfa.BEEF"`)
-	if tok != "mfa.BEEF" {
-		t.Fatal("Token was not parsed correctly")
-	}
+	assert.Equal(t, "mfa.BEEF", tok)
 }
