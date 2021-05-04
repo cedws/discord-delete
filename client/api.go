@@ -20,14 +20,14 @@ var endpoints = map[string]string{
 	"guilds":         "/users/@me/guilds",
 	"guild_channels": "/guilds/%v/channels",
 	"guild_msgs": "/guilds/%v/messages/search" +
-		"?author_id=%v" +
-		"&include_nsfw=true" +
+		"?include_nsfw=true" +
+		"&author_id=%v" +
 		"&offset=%v" +
 		"&limit=%v",
 	"channels": "/users/@me/channels",
 	"channel_msgs": "/channels/%v/messages/search" +
-		"?author_id=%v" +
-		"&include_nsfw=true" +
+		"?include_nsfw=true" +
+		"&author_id=%v" +
 		"&offset=%v" +
 		"&limit=%v",
 	"delete_msg": "/channels/%v/messages/%v",
@@ -36,9 +36,11 @@ var endpoints = map[string]string{
 type Client struct {
 	deletedCount int
 	requestCount int
-	dryRun       bool
 	token        string
 	spoof        spoof.Info
+	dryRun       bool
+	maxID        int64
+	minID        int64
 	skipChannels []string
 	httpClient   http.Client
 }
@@ -49,14 +51,6 @@ func New(token string) (c Client) {
 		spoof:      spoof.RandomInfo(),
 		httpClient: http.Client{},
 	}
-}
-
-func (c *Client) SetDryRun(dryRun bool) {
-	c.dryRun = dryRun
-}
-
-func (c *Client) SetSkipChannels(skipChannels []string) {
-	c.skipChannels = skipChannels
 }
 
 func (c *Client) PartialDelete() error {

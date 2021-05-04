@@ -27,7 +27,22 @@ func (c *Client) Channels() ([]Channel, error) {
 }
 
 func (c *Client) ChannelMessages(channel *Channel, me *Me, seek *int) (*Messages, error) {
-	endpoint := fmt.Sprintf(endpoints["channel_msgs"], channel.ID, me.ID, *seek, messageLimit)
+	endpoint := fmt.Sprintf(
+		endpoints["channel_msgs"],
+		channel.ID,
+		me.ID,
+		*seek,
+		messageLimit,
+	)
+
+	if c.minID > 0 {
+		endpoint = fmt.Sprintf("%v&min_id=%v", endpoint, c.minID)
+	}
+
+	if c.maxID > 0 {
+		endpoint = fmt.Sprintf("%v&max_id=%v", endpoint, c.maxID)
+	}
+
 	var results Messages
 	err := c.request("GET", endpoint, nil, &results)
 	if err != nil {
@@ -76,7 +91,21 @@ func (c *Client) Guilds() ([]Channel, error) {
 }
 
 func (c *Client) GuildMessages(channel *Channel, me *Me, seek *int) (*Messages, error) {
-	endpoint := fmt.Sprintf(endpoints["guild_msgs"], channel.ID, me.ID, *seek, messageLimit)
+	endpoint := fmt.Sprintf(
+		endpoints["guild_msgs"],
+		channel.ID,
+		me.ID,
+		*seek,
+		messageLimit,
+	)
+
+	if c.minID > 0 {
+		endpoint = fmt.Sprintf("%v&min_id=%v", endpoint, c.minID)
+	}
+
+	if c.maxID > 0 {
+		endpoint = fmt.Sprintf("%v&max_id=%v", endpoint, c.maxID)
+	}
 
 	var results Messages
 
