@@ -81,7 +81,7 @@ Relationships:
 		for _, channel := range channels {
 			// If the relation is the sole recipient in one of the channels we found
 			// earlier, skip it.
-			if channel.Type == PrivateChannel && channel.Recipients[0].ID == relation.ID {
+			if channel.Type == DirectChannel && channel.Recipients[0].ID == relation.ID {
 				log.Debugf("Skipping resolving relation %v because the user already has the channel open", relation.ID)
 				continue Relationships
 			}
@@ -187,8 +187,8 @@ func (c *Client) DeleteMessages(messages *Messages, seek *int) error {
 
 			// The message might be an action rather than text. Actions aren't deletable.
 			// An example of an action is a call request.
-			if msg.Type != UserMessage {
-				log.Debugf("Found message of non-zero type, incrementing seek index")
+			if msg.Type != UserMessage && msg.Type != UserReply {
+				log.Debugf("Found message of type %v, seeking ahead", msg.Type)
 				(*seek)++
 				continue
 			}
@@ -322,12 +322,15 @@ func (c *Client) wait(res *http.Response, mult int) error {
 	return nil
 }
 
+// https://discord.com/developers/docs/resources/channel#message-object-message-types
 const (
 	UserMessage = 0
+	UserReply   = 19
 )
 
+// https://discord.com/developers/docs/resources/channel#channel-object-channel-types
 const (
-	PrivateChannel = 1
+	DirectChannel = 1
 )
 
 type Me struct {
