@@ -10,8 +10,8 @@ import (
 
 var (
 	dryrun       bool
-	minAge       string
-	maxAge       string
+	minAge       uint
+	maxAge       uint
 	skipChannels []string
 )
 
@@ -45,20 +45,20 @@ func partial(cmd *cobra.Command, args []string) {
 	client.SetDryRun(dryrun)
 	client.SetSkipChannels(skipChannels)
 
-	if minAge != "" {
+	if minAge > 0 {
 		err = client.SetMinAge(minAge)
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Infof("Deleting messages with a minimum age of %v", minAge)
+		log.Infof("Deleting messages with a minimum age of %v days", minAge)
 	}
 
-	if maxAge != "" {
+	if maxAge > 0 {
 		err = client.SetMaxAge(maxAge)
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Infof("Deleting messages with a maximum age of %v", maxAge)
+		log.Infof("Deleting messages with a maximum age of %v days", maxAge)
 	}
 
 	err = client.PartialDelete()
@@ -69,7 +69,7 @@ func partial(cmd *cobra.Command, args []string) {
 
 func init() {
 	partialCmd.Flags().BoolVarP(&dryrun, "dry-run", "d", false, "perform dry run without deleting anything")
-	partialCmd.Flags().StringVarP(&minAge, "min-age", "i", "", "minimum age of messages to delete")
-	partialCmd.Flags().StringVarP(&maxAge, "max-age", "a", "", "maximum age of messages to delete")
+	partialCmd.Flags().UintVarP(&minAge, "min-age-days", "i", 0, "minimum age in days of messages to delete")
+	partialCmd.Flags().UintVarP(&maxAge, "max-age-days", "a", 0, "maximum age in days of messages to delete")
 	partialCmd.Flags().StringSliceVarP(&skipChannels, "skip", "s", []string{}, "skip message deletion for specified channels/guilds")
 }
