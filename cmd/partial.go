@@ -44,6 +44,10 @@ func partial(cmd *cobra.Command, args []string) {
 	client := client.New(tok)
 	client.SetDryRun(dryrun)
 	client.SetSkipChannels(skipChannels)
+	
+	if dryrun {
+		log.Infof("No messages will be deleted in dry-run mode")
+	}
 
 	if minAge > 0 {
 		err = client.SetMinAge(minAge)
