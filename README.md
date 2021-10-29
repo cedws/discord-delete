@@ -6,7 +6,7 @@ A tool for deleting Discord message history.
 
 ## Features
 - Fast and efficient deletions
-- Automatic token retrieval from Discord Client (currently for Windows and Linux only)
+- Automatic token retrieval from Discord client (Windows, macOS, Linux)
 - Dry run mode
 
 ## Usage

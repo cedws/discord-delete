@@ -1,5 +1,3 @@
-//+build linux
-
 package token
 
 import (
@@ -21,9 +19,13 @@ func GetToken() (string, error) {
 		log.Debugf("Searching for LevelDB database in %v", path)
 
 		tok, err := searchLevelDB(path)
-		if err == nil {
-			return tok, nil
+		if err != nil {
+			// Try another database
+			log.Debug(err)
+			continue
 		}
+
+		return tok, nil
 	}
 
 	return "", ErrorTokenRetrieve

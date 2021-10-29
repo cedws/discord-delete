@@ -4,18 +4,21 @@ import (
 	log "github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
+	"runtime"
 )
 
-var versions = []string{"Discord", "discordcanary", "discordptb"}
+var versions = []string{"discord", "discordcanary", "discordptb"}
 
 func GetToken() (string, error) {
-	appdata, def := os.LookupEnv("APPDATA")
+	log.Warnf("Discord must not be running to retrieve your token under %v", runtime.GOOS)
+
+	home, def := os.LookupEnv("HOME")
 	if !def {
-		return "", ErrorNoAppdataPath
+		return "", ErrorNoHomePath
 	}
 
 	for _, ver := range versions {
-		path := filepath.Join(appdata, ver, "Local Storage/leveldb")
+		path := filepath.Join(home, "Library/Application Support", ver, "Local Storage/leveldb")
 		log.Debugf("Searching for LevelDB database in %v", path)
 
 		tok, err := searchLevelDB(path)
