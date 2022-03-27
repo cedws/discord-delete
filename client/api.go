@@ -232,7 +232,7 @@ func (c *Client) skipChannel(channel string) bool {
 	return false
 }
 
-func (c *Client) request(method string, endpoint string, reqData interface{}, resData interface{}) error {
+func (c *Client) request(method string, endpoint string, reqData any, resData any) error {
 	url := api + endpoint
 	log.Debugf("%v %v", method, url)
 
