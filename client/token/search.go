@@ -14,12 +14,12 @@ import (
 // Hence why we need to try and lookup both variants
 // We also support grabbing tokens for PTB/Canary, so look these up too
 var tokenKeys = []string{
-	"_https://discord.com\x00\x01token",
 	"_https://discordapp.com\x00\x01token",
-	"_https://ptb.discord.com\x00\x01token",
+	"_https://discord.com\x00\x01token",
 	"_https://ptb.discordapp.com\x00\x01token",
-	"_https://canary.discord.com\x00\x01token",
+	"_https://ptb.discord.com\x00\x01token",
 	"_https://canary.discordapp.com\x00\x01token",
+	"_https://canary.discord.com\x00\x01token",
 }
 
 func parseToken(data string) (string, error) {
