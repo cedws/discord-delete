@@ -3,13 +3,15 @@ package cmd
 import (
 	"discord-delete/client"
 	"discord-delete/client/token"
+	"os"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 var (
 	dryrun       bool
+	skipPinned   bool
 	minAge       uint
 	maxAge       uint
 	skipChannels []string
@@ -43,7 +45,8 @@ func partial(cmd *cobra.Command, args []string) {
 	client := client.New(tok)
 	client.SetDryRun(dryrun)
 	client.SetSkipChannels(skipChannels)
-	
+	client.SetSkipPinned(skipPinned)
+
 	if dryrun {
 		log.Infof("No messages will be deleted in dry-run mode")
 	}
@@ -75,4 +78,5 @@ func init() {
 	partialCmd.Flags().UintVarP(&minAge, "older-than-days", "o", 0, "minimum number in days of messages to be deleted")
 	partialCmd.Flags().UintVarP(&maxAge, "newer-than-days", "n", 0, "maximum number in days of messages to be deleted")
 	partialCmd.Flags().StringSliceVarP(&skipChannels, "skip", "s", []string{}, "skip message deletion for specified channels/guilds")
+	partialCmd.Flags().BoolVarP(&skipPinned, "skip-pinned", "p", false, "skip message deletion for pinned messages")
 }

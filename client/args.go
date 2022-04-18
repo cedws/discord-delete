@@ -2,8 +2,9 @@ package client
 
 import (
 	"errors"
-	log "github.com/sirupsen/logrus"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -18,6 +19,10 @@ func (c *Client) SetDryRun(dryRun bool) {
 
 func (c *Client) SetSkipChannels(skipChannels []string) {
 	c.skipChannels = skipChannels
+}
+
+func (c *Client) SetSkipPinned(skipPinned bool) {
+	c.skipPinned = skipPinned
 }
 
 func (c *Client) SetMinAge(minAge uint) error {
