@@ -5,10 +5,11 @@ import (
 	"discord-delete/client/spoof"
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"net/http"
 	"time"
+
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 const api = "https://discord.com/api/v8"
@@ -42,6 +43,7 @@ type Client struct {
 	maxID        int64
 	minID        int64
 	skipChannels []string
+	skipPinned   bool
 	httpClient   http.Client
 }
 
@@ -204,6 +206,12 @@ func (c *Client) DeleteMessages(messages *Messages, seek *int) error {
 				continue
 			}
 
+			if c.skipPinned && msg.Pinned {
+				log.Infof("Found pinned message, skipping")
+				(*seek)++
+				continue
+			}
+
 			log.Infof("Deleting message %v from channel %v", msg.ID, msg.ChannelID)
 			if c.dryRun {
 				// Move seek index forward to simulate message deletion on server's side
@@ -360,6 +368,7 @@ type Message struct {
 	Hit       bool   `json:"hit,omitempty"`
 	ChannelID string `json:"channel_id"`
 	Type      int    `json:"type"`
+	Pinned    bool   `json:"pinned"`
 }
 
 type Messages struct {
