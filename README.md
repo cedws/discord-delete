@@ -22,3 +22,6 @@ Discord does not take a strong stance on privacy, unlike many other IM platforms
 - Encouraging users to "connect" other profiles, presumably to gain more data about the user
 
 ...amongst other egregious infringements on privacy, which you can find a list of [here](https://privacyspy.org/product/discord/) and [here](https://cadence.moe/blog/2020-06-06-why-you-shouldnt-trust-discord).
+
+### Note
+It is recommended to first open all your DMs with tools such as [discord-dms-opener](https://github.com/Empyreann/discord-dms-opener) and then proceed for deletion.
