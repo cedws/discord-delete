@@ -219,7 +219,8 @@ func (c *Client) DeleteMessages(messages *Messages, seek *int) error {
 			} else {
 				err := c.DeleteMessage(&msg)
 				if err != nil {
-					return errors.Wrap(err, "Error deleting message")
+          //return errors.Wrap(err, "Error deleting message")
+					log.Infof("--- Error deleting message")
 				}
 				time.Sleep(minSleep * time.Millisecond)
 			}
