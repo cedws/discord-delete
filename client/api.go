@@ -8,13 +8,14 @@ import (
 	"time"
 
 	"github.com/adversarialtools/discord-delete/client/spoof"
-	"github.com/pkg/errors"
 
 	log "github.com/sirupsen/logrus"
 )
 
-const api = "https://discord.com/api/v10"
-const messageLimit = 25
+const (
+	api          = "https://discord.com/api/v10"
+	messageLimit = 25
+)
 
 var endpoints = map[string]string{
 	"me":             "/users/@me",
@@ -59,24 +60,23 @@ func New(token string) (c Client) {
 func (c *Client) PartialDelete() error {
 	me, err := c.Me()
 	if err != nil {
-		return errors.Wrap(err, "Error fetching profile information")
+		return fmt.Errorf("error fetching profile information: %w", err)
 	}
 
 	channels, err := c.Channels()
 	if err != nil {
-		return errors.Wrap(err, "Error fetching channels")
+		return fmt.Errorf("error fetching channels: %w", err)
 	}
 
 	for _, channel := range channels {
-		err = c.DeleteFromChannel(me, &channel)
-		if err != nil {
+		if err = c.DeleteFromChannel(me, &channel); err != nil {
 			return err
 		}
 	}
 
 	relationships, err := c.Relationships()
 	if err != nil {
-		return errors.Wrap(err, "Error fetching relationships")
+		return fmt.Errorf("error fetching relationships: %w", err)
 	}
 
 Relationships:
@@ -85,43 +85,41 @@ Relationships:
 			// If the relation is the sole recipient in one of the channels we found
 			// earlier, skip it.
 			if channel.Type == DirectChannel && channel.Recipients[0].ID == relation.ID {
-				log.Debugf("Skipping resolving relation %v because the user already has the channel open", relation.ID)
+				log.Debugf("skipping resolving relation %v because the user already has the channel open", relation.ID)
 				continue Relationships
 			}
 		}
 
 		channel, err := c.ChannelRelationship(&relation.Recipient)
 		if err != nil {
-			return errors.Wrap(err, "Error resolving relationship to channel")
+			return fmt.Errorf("error resolving relationship to channel: %w", err)
 		}
 
-		log.Infof("Resolved relationship with '%v' to channel %v", relation.Recipient.Username, channel.ID)
+		log.Infof("resolved relationship with '%v' to channel %v", relation.Recipient.Username, channel.ID)
 
-		err = c.DeleteFromChannel(me, channel)
-		if err != nil {
+		if err = c.DeleteFromChannel(me, channel); err != nil {
 			return err
 		}
 	}
 
 	guilds, err := c.Guilds()
 	if err != nil {
-		return errors.Wrap(err, "Error fetching guilds")
+		return fmt.Errorf("error fetching guilds: %w", err)
 	}
 	for _, guild := range guilds {
-		err = c.DeleteFromGuild(me, &guild)
-		if err != nil {
+		if err = c.DeleteFromGuild(me, &guild); err != nil {
 			return err
 		}
 	}
 
-	log.Infof("Finished deleting messages: %v deleted in %v total requests", c.deletedCount, c.requestCount)
+	log.Infof("finished deleting messages: %v deleted in %v total requests", c.deletedCount, c.requestCount)
 
 	return nil
 }
 
 func (c *Client) DeleteFromChannel(me *Me, channel *Channel) error {
 	if c.skipChannel(channel.ID) {
-		log.Infof("Skipping message deletion for channel %v", channel.ID)
+		log.Infof("skipping message deletion for channel %v", channel.ID)
 		return nil
 	}
 
@@ -130,15 +128,14 @@ func (c *Client) DeleteFromChannel(me *Me, channel *Channel) error {
 	for {
 		results, err := c.ChannelMessages(channel, me, &seek)
 		if err != nil {
-			return errors.Wrap(err, "Error fetching messages for channel")
+			return fmt.Errorf("error fetching messages for channel: %w", err)
 		}
 		if len(results.ContextMessages) == 0 {
-			log.Infof("No more messages to delete for channel %v", channel.ID)
+			log.Infof("no more messages to delete for channel %v", channel.ID)
 			break
 		}
 
-		err = c.DeleteMessages(results, &seek)
-		if err != nil {
+		if err = c.DeleteMessages(results, &seek); err != nil {
 			return err
 		}
 	}
@@ -148,7 +145,7 @@ func (c *Client) DeleteFromChannel(me *Me, channel *Channel) error {
 
 func (c *Client) DeleteFromGuild(me *Me, channel *Channel) error {
 	if c.skipChannel(channel.ID) {
-		log.Infof("Skipping message deletion for guild '%v'", channel.Name)
+		log.Infof("skipping message deletion for guild '%v'", channel.Name)
 		return nil
 	}
 
@@ -157,15 +154,14 @@ func (c *Client) DeleteFromGuild(me *Me, channel *Channel) error {
 	for {
 		results, err := c.GuildMessages(channel, me, &seek)
 		if err != nil {
-			return errors.Wrap(err, "Error fetching messages for guild")
+			return fmt.Errorf("error fetching messages for guild: %w", err)
 		}
 		if len(results.ContextMessages) == 0 {
-			log.Infof("No more messages to delete for guild '%v'", channel.Name)
+			log.Infof("no more messages to delete for guild '%v'", channel.Name)
 			break
 		}
 
-		err = c.DeleteMessages(results, &seek)
-		if err != nil {
+		if err = c.DeleteMessages(results, &seek); err != nil {
 			return err
 		}
 	}
@@ -184,14 +180,14 @@ func (c *Client) DeleteMessages(messages *Messages, seek *int) error {
 			if !msg.Hit {
 				// This is a context message which may or may not be authored
 				// by the current user
-				log.Debugf("Skipping context message")
+				log.Debugf("skipping context message")
 				continue
 			}
 
 			// The message might be an action rather than text. Actions aren't deletable.
 			// An example of an action is a call request.
 			if msg.Type != UserMessage && msg.Type != UserReply {
-				log.Debugf("Found message of type %v, seeking ahead", msg.Type)
+				log.Debugf("found message of type %v, seeking ahead", msg.Type)
 				(*seek)++
 				continue
 			}
@@ -202,25 +198,24 @@ func (c *Client) DeleteMessages(messages *Messages, seek *int) error {
 			// We do it this way because guilds searches return a mix of messages
 			// from any channel
 			if c.skipChannel(msg.ChannelID) {
-				log.Infof("Skipping message deletion for channel %v", msg.ChannelID)
+				log.Infof("skipping message deletion for channel %v", msg.ChannelID)
 				(*seek)++
 				continue
 			}
 
 			if c.skipPinned && msg.Pinned {
-				log.Infof("Found pinned message, skipping")
+				log.Infof("found pinned message, skipping")
 				(*seek)++
 				continue
 			}
 
-			log.Infof("Deleting message %v from channel %v", msg.ID, msg.ChannelID)
+			log.Infof("deleting message %v from channel %v", msg.ID, msg.ChannelID)
 			if c.dryRun {
 				// Move seek index forward to simulate message deletion on server's side
 				(*seek)++
 			} else {
-				err := c.DeleteMessage(&msg)
-				if err != nil {
-					return errors.Wrap(err, "Error deleting message")
+				if err := c.DeleteMessage(&msg); err != nil {
+					return fmt.Errorf("error deleting message: %w", err)
 				}
 				time.Sleep(minSleep * time.Millisecond)
 			}
@@ -247,14 +242,13 @@ func (c *Client) request(method string, endpoint string, reqData any, resData an
 
 	buffer := new(bytes.Buffer)
 	if reqData != nil {
-		err := json.NewEncoder(buffer).Encode(reqData)
-		if err != nil {
-			return errors.Wrap(err, "Error encoding request data")
+		if err := json.NewEncoder(buffer).Encode(reqData); err != nil {
+			return fmt.Errorf("error encoding request data: %w", err)
 		}
 	}
 	req, err := http.NewRequest(method, url, buffer)
 	if err != nil {
-		return errors.Wrap(err, "Error building request")
+		return fmt.Errorf("error building request: %w", err)
 	}
 	req.Header.Set("Authorization", c.token)
 	req.Header.Set("X-Super-Properties", c.spoof.SuperProps)
@@ -263,35 +257,27 @@ func (c *Client) request(method string, endpoint string, reqData any, resData an
 
 	res, err := c.httpClient.Do(req)
 	if err != nil {
-		return errors.Wrap(err, "Error sending request")
+		return fmt.Errorf("error sending request: %w", err)
 	}
+	defer res.Body.Close()
 
 	c.requestCount++
 
-	defer func() {
-		err := res.Body.Close()
-		if err != nil {
-			log.Fatal(errors.Wrap(err, "Error closing Body"))
-		}
-	}()
-
-	log.Debugf("Server returned status %v", http.StatusText(res.StatusCode))
+	log.Debugf("server returned status %v", http.StatusText(res.StatusCode))
 
 	switch status := res.StatusCode; {
 	case status >= http.StatusInternalServerError:
-		return fmt.Errorf("Bad status code %v", http.StatusText(res.StatusCode))
+		return fmt.Errorf("bad status code %v", http.StatusText(res.StatusCode))
 	case status == http.StatusAccepted:
 		// retry_after is an integer in milliseconds
-		err := c.wait(res, 1)
-		if err != nil {
+		if err := c.wait(res, 1); err != nil {
 			return err
 		}
 		// Try again once we've waited for the period that the server has asked us to.
 		return c.request(method, endpoint, reqData, resData)
 	case status == http.StatusTooManyRequests:
 		// retry_after is a float in seconds
-		err := c.wait(res, 1000)
-		if err != nil {
+		if err := c.wait(res, 1000); err != nil {
 			return err
 		}
 		// Try again once we've waited for the period that the server has asked us to.
@@ -299,18 +285,17 @@ func (c *Client) request(method string, endpoint string, reqData any, resData an
 	case status == http.StatusForbidden:
 		break
 	case status == http.StatusUnauthorized:
-		return fmt.Errorf("Bad status code %v, log out and log back in to Discord or verify your token is correct", http.StatusText(res.StatusCode))
+		return fmt.Errorf("bad status code %v, log out and log back in to discord or verify your token is correct", http.StatusText(res.StatusCode))
 	case status == http.StatusBadRequest:
-		return fmt.Errorf("Bad status code %v", http.StatusText(res.StatusCode))
+		return fmt.Errorf("bad status code %v", http.StatusText(res.StatusCode))
 	case status == http.StatusNoContent:
 		break
 	case status == http.StatusOK:
-		err := json.NewDecoder(res.Body).Decode(resData)
-		if err != nil {
-			return errors.Wrap(err, "Error decoding response")
+		if err := json.NewDecoder(res.Body).Decode(resData); err != nil {
+			return fmt.Errorf("error decoding response: %w", err)
 		}
 	default:
-		return fmt.Errorf("Status code %v is unhandled", http.StatusText(res.StatusCode))
+		return fmt.Errorf("status code %v is unhandled", http.StatusText(res.StatusCode))
 	}
 
 	return nil
@@ -318,14 +303,13 @@ func (c *Client) request(method string, endpoint string, reqData any, resData an
 
 func (c *Client) wait(res *http.Response, mult int) error {
 	data := new(ServerWait)
-	err := json.NewDecoder(res.Body).Decode(data)
-	if err != nil {
-		return errors.Wrap(err, "Error decoding response")
+	if err := json.NewDecoder(res.Body).Decode(data); err != nil {
+		return fmt.Errorf("error decoding response: %w", err)
 	}
 
 	// Multiply retry_after by the mult passed in
 	millis := time.Duration(data.RetryAfter*float32(mult)) * time.Millisecond
-	log.Infof("Server asked us to sleep for %v", millis)
+	log.Infof("server asked us to sleep for %v", millis)
 	time.Sleep(millis)
 
 	return nil

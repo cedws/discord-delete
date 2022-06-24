@@ -8,22 +8,16 @@ func (c *Client) Me() (*Me, error) {
 	endpoint := endpoints["me"]
 	var me Me
 	err := c.request("GET", endpoint, nil, &me)
-	if err != nil {
-		return nil, err
-	}
 
-	return &me, nil
+	return &me, err
 }
 
 func (c *Client) Channels() ([]Channel, error) {
 	endpoint := endpoints["channels"]
 	var channels []Channel
-	err := c.request("GET", endpoint, nil, &channels)
-	if err != nil {
-		return nil, err
-	}
 
-	return channels, nil
+	err := c.request("GET", endpoint, nil, &channels)
+	return channels, err
 }
 
 func (c *Client) ChannelMessages(channel *Channel, me *Me, seek *int) (*Messages, error) {
@@ -45,11 +39,8 @@ func (c *Client) ChannelMessages(channel *Channel, me *Me, seek *int) (*Messages
 
 	var results Messages
 	err := c.request("GET", endpoint, nil, &results)
-	if err != nil {
-		return nil, err
-	}
 
-	return &results, nil
+	return &results, err
 }
 
 func (c *Client) ChannelRelationship(relation *Recipient) (*Channel, error) {
@@ -60,34 +51,25 @@ func (c *Client) ChannelRelationship(relation *Recipient) (*Channel, error) {
 		[]string{relation.ID},
 	}
 	var channel Channel
-	err := c.request("POST", endpoint, recipients, &channel)
-	if err != nil {
-		return nil, err
-	}
 
-	return &channel, nil
+	err := c.request("POST", endpoint, recipients, &channel)
+	return &channel, err
 }
 
 func (c *Client) Relationships() ([]Relationship, error) {
 	endpoint := endpoints["relationships"]
 	var relations []Relationship
-	err := c.request("GET", endpoint, nil, &relations)
-	if err != nil {
-		return nil, err
-	}
 
-	return relations, nil
+	err := c.request("GET", endpoint, nil, &relations)
+	return relations, err
 }
 
 func (c *Client) Guilds() ([]Channel, error) {
 	endpoint := endpoints["guilds"]
 	var channels []Channel
-	err := c.request("GET", endpoint, nil, &channels)
-	if err != nil {
-		return nil, err
-	}
 
-	return channels, nil
+	err := c.request("GET", endpoint, nil, &channels)
+	return channels, err
 }
 
 func (c *Client) GuildMessages(channel *Channel, me *Me, seek *int) (*Messages, error) {
@@ -110,9 +92,5 @@ func (c *Client) GuildMessages(channel *Channel, me *Me, seek *int) (*Messages, 
 	var results Messages
 
 	err := c.request("GET", endpoint, nil, &results)
-	if err != nil {
-		return nil, err
-	}
-
-	return &results, nil
+	return &results, err
 }

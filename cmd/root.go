@@ -10,6 +10,11 @@ var (
 	rootCmd = &cobra.Command{
 		Use:   "discord-delete",
 		Short: "A tool to delete Discord message history",
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			if verbose {
+				log.SetLevel(log.DebugLevel)
+			}
+		},
 	}
 )
 

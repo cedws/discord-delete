@@ -24,22 +24,16 @@ var partialCmd = &cobra.Command{
 }
 
 func partial(cmd *cobra.Command, args []string) {
-	if verbose {
-		log.SetLevel(log.DebugLevel)
-	}
-
-	log.Warn("Any tool that deletes your messages, including this one, could result in the termination of your account. You have been warned!")
+	log.Warn("any tool that deletes your messages, including this one, could result in the termination of your account")
 
 	var tok string
 	var err error
 
 	tok, def := os.LookupEnv("DISCORD_TOKEN")
-
 	if !def {
-		tok, err = token.GetToken()
-		if err != nil {
+		if tok, err = token.GetToken(); err != nil {
 			log.Debug(err)
-			log.Fatal("Error retrieving token, pass DISCORD_TOKEN as an environment variable instead")
+			log.Fatal("error retrieving token, pass DISCORD_TOKEN as an environment variable instead")
 		}
 	}
 
@@ -49,27 +43,24 @@ func partial(cmd *cobra.Command, args []string) {
 	client.SetSkipPinned(skipPinned)
 
 	if dryrun {
-		log.Infof("No messages will be deleted in dry-run mode")
+		log.Infof("no messages will be deleted in dry-run mode")
 	}
 
 	if minAge > 0 {
-		err = client.SetMinAge(minAge)
-		if err != nil {
+		if err := client.SetMinAge(minAge); err != nil {
 			log.Fatal(err)
 		}
-		log.Infof("Deleting messages older than %v days", minAge)
+		log.Infof("deleting messages older than %v days", minAge)
 	}
 
 	if maxAge > 0 {
-		err = client.SetMaxAge(maxAge)
-		if err != nil {
+		if err = client.SetMaxAge(maxAge); err != nil {
 			log.Fatal(err)
 		}
-		log.Infof("Deleting messages newer than %v days", maxAge)
+		log.Infof("deleting messages newer than %v days", maxAge)
 	}
 
-	err = client.PartialDelete()
-	if err != nil {
+	if err = client.PartialDelete(); err != nil {
 		log.Fatal(err)
 	}
 }
