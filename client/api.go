@@ -12,7 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const api = "https://discord.com/api/v8"
+const api = "https://discord.com/api/v10"
 const messageLimit = 25
 
 var endpoints = map[string]string{
