@@ -218,9 +218,9 @@ func (c *Client) DeleteMessages(messages *Messages, seek *int) error {
 				(*seek)++
 			} else {
 				err := c.DeleteMessage(&msg)
-      if err != nil {
-        log.Infof("--- Error deleting message")
-      }
+				if err != nil {
+					log.Infof("--- Error deleting message")
+				}
 				time.Sleep(minSleep * time.Millisecond)
 			}
 			// Increment regardless of whether it's a dry run
