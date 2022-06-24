@@ -1,11 +1,11 @@
-package client
+package snowflake
 
 const discordEpoch = 1420070400000
 
-func toSnowflake(millis int64) int64 {
+func ToSnowflake(millis int64) int64 {
 	return (millis - discordEpoch) << 22
 }
 
-func fromSnowflake(snowflake int64) int64 {
+func FromSnowflake(snowflake int64) int64 {
 	return (snowflake >> 22) + discordEpoch
 }
