@@ -1,8 +1,9 @@
 package token
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestUnquotedBadToken(t *testing.T) {

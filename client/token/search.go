@@ -1,12 +1,13 @@
 package token
 
 import (
+	"regexp"
+	"strconv"
+
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
-	"regexp"
-	"strconv"
 )
 
 // Discord moved to https://discord.com as of some time around May 2020

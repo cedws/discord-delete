@@ -2,13 +2,14 @@ package client
 
 import (
 	"bytes"
-	"discord-delete/client/spoof"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/adversarialtools/discord-delete/client/spoof"
 	"github.com/pkg/errors"
+
 	log "github.com/sirupsen/logrus"
 )
 

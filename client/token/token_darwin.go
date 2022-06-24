@@ -1,10 +1,11 @@
 package token
 
 import (
-	log "github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
 	"runtime"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var versions = []string{"discord", "discordcanary", "discordptb"}

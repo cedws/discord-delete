@@ -1,7 +1,7 @@
 package main
 
 import (
-	"discord-delete/cmd"
+	"github.com/adversarialtools/discord-delete/cmd"
 )
 
 func main() {

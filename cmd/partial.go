@@ -1,9 +1,10 @@
 package cmd
 
 import (
-	"discord-delete/client"
-	"discord-delete/client/token"
 	"os"
+
+	"github.com/adversarialtools/discord-delete/client"
+	"github.com/adversarialtools/discord-delete/client/token"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"

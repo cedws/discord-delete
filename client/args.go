@@ -4,6 +4,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/adversarialtools/discord-delete/client/snowflake"
+
 	log "github.com/sirupsen/logrus"
 )
 

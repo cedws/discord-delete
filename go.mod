@@ -1,4 +1,4 @@
-module discord-delete
+module github.com/adversarialtools/discord-delete
 
 go 1.18
 
