@@ -17,7 +17,7 @@ func GetToken() (string, error) {
 
 	for _, ver := range versions {
 		path := filepath.Join(home, ".config", ver, "Local Storage/leveldb")
-		log.Debugf("Searching for LevelDB database in %v", path)
+		log.Debugf("searching for leveldb database in %v", path)
 
 		tok, err := searchLevelDB(path)
 		if err != nil {

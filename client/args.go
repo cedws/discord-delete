@@ -9,7 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var ErrorInvalidDuration = errors.New("Failed to parse duration")
+var ErrorInvalidDuration = errors.New("error parsing duration")
 
 const day = time.Hour * 24
 
@@ -30,7 +30,7 @@ func (c *Client) SetMinAge(minAge uint) error {
 	millis := t.UnixNano() / int64(time.Millisecond)
 
 	c.maxID = snowflake.ToSnowflake(millis)
-	log.Debugf("Message maximum ID must be %v", c.maxID)
+	log.Debugf("message maximum ID must be %v", c.maxID)
 
 	return nil
 }
@@ -40,7 +40,7 @@ func (c *Client) SetMaxAge(maxAge uint) error {
 	millis := t.UnixNano() / int64(time.Millisecond)
 
 	c.minID = snowflake.ToSnowflake(millis)
-	log.Debugf("Message minimum ID must be %v", c.minID)
+	log.Debugf("message minimum ID must be %v", c.minID)
 
 	return nil
 }

@@ -37,7 +37,7 @@ func searchLevelDB(path string) (string, error) {
 		ReadOnly: true,
 	})
 	if err != nil {
-		return "", errors.Wrap(err, "Couldn't open database")
+		return "", errors.Wrap(err, "error opening database")
 	}
 	defer func() {
 		// Drop error, we don't care if this fails
@@ -45,7 +45,7 @@ func searchLevelDB(path string) (string, error) {
 	}()
 
 	for _, key := range tokenKeys {
-		log.Debugf("Looking for token under key %v", strconv.Quote(key))
+		log.Debugf("looking for token under key %v", strconv.Quote(key))
 
 		data, err := db.Get([]byte(key), nil)
 		// Ignore if token is empty
