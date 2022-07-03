@@ -3,8 +3,8 @@ package cmd
 import (
 	"os"
 
-	"github.com/adversarialtools/discord-delete/client"
-	"github.com/adversarialtools/discord-delete/client/token"
+	"github.com/cedws/discord-delete/client"
+	"github.com/cedws/discord-delete/client/token"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"

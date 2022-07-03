@@ -1,4 +1,4 @@
-module github.com/adversarialtools/discord-delete
+module github.com/cedws/discord-delete
 
 go 1.18
 

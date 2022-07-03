@@ -10,8 +10,8 @@ A tool for deleting Discord message history.
 - Dry run mode
 
 ## Usage
-- [Running a partial deletion](https://github.com/adversarialtools/discord-delete/wiki/Running-a-partial-deletion)
-- [Skipping specific channels](https://github.com/adversarialtools/discord-delete/wiki/Skipping-specific-channels)
+- [Running a partial deletion](https://github.com/cedws/discord-delete/wiki/Running-a-partial-deletion)
+- [Skipping specific channels](https://github.com/cedws/discord-delete/wiki/Skipping-specific-channels)
 
 ## Why?
 Discord does not take a strong stance on privacy, unlike many other IM platforms that exist today, such as [Matrix](https://matrix.org/). This is visible from the choices they've made in designing their platform:

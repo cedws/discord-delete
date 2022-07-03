@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/adversarialtools/discord-delete/client/spoof"
+	"github.com/cedws/discord-delete/client/spoof"
 
 	log "github.com/sirupsen/logrus"
 )
