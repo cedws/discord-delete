@@ -58,8 +58,17 @@ type Message struct {
 }
 
 type Messages struct {
-	TotalResults    int         `json:"total_results"`
-	ContextMessages [][]Message `json:"messages"`
+	TotalResults int         `json:"total_results"`
+	Messages     [][]Message `json:"messages"`
+	Threads      []Thread    `json:"threads"`
+}
+
+type Thread struct {
+	ID       string
+	Metadata struct {
+		Archived bool
+		Locked   bool
+	} `json:"thread_metadata"`
 }
 
 type ServerWait struct {
@@ -131,7 +140,7 @@ func (c *Client) Delete() error {
 	}
 
 	for _, channel := range channels {
-		if err = c.DeleteFromChannel(me, &channel); err != nil {
+		if err = c.DeleteFromChannel(me, channel); err != nil {
 			return err
 		}
 	}
@@ -152,7 +161,7 @@ Relationships:
 			}
 		}
 
-		channel, err := c.ChannelRelationship(&relation.Recipient)
+		channel, err := c.RelationshipChannel(relation.Recipient)
 		if err != nil {
 			return fmt.Errorf("error resolving relationship to channel: %w", err)
 		}
@@ -169,7 +178,7 @@ Relationships:
 		return fmt.Errorf("error fetching guilds: %w", err)
 	}
 	for _, guild := range guilds {
-		if err = c.DeleteFromGuild(me, &guild); err != nil {
+		if err = c.DeleteFromGuild(me, guild); err != nil {
 			return err
 		}
 	}
@@ -179,7 +188,7 @@ Relationships:
 	return nil
 }
 
-func (c *Client) DeleteFromChannel(me *Me, channel *Channel) error {
+func (c *Client) DeleteFromChannel(me Me, channel Channel) error {
 	if c.skipChannel(channel.ID) {
 		log.Infof("skipping message deletion for channel %v", channel.ID)
 		return nil
@@ -192,7 +201,7 @@ func (c *Client) DeleteFromChannel(me *Me, channel *Channel) error {
 		if err != nil {
 			return fmt.Errorf("error fetching messages for channel: %w", err)
 		}
-		if len(results.ContextMessages) == 0 {
+		if len(results.Messages) == 0 {
 			log.Infof("no more messages to delete for channel %v", channel.ID)
 			break
 		}
@@ -205,7 +214,7 @@ func (c *Client) DeleteFromChannel(me *Me, channel *Channel) error {
 	return nil
 }
 
-func (c *Client) DeleteFromGuild(me *Me, channel *Channel) error {
+func (c *Client) DeleteFromGuild(me Me, channel Channel) error {
 	if c.skipChannel(channel.ID) {
 		log.Infof("skipping message deletion for guild '%v'", channel.Name)
 		return nil
@@ -218,7 +227,7 @@ func (c *Client) DeleteFromGuild(me *Me, channel *Channel) error {
 		if err != nil {
 			return fmt.Errorf("error fetching messages for guild: %w", err)
 		}
-		if len(results.ContextMessages) == 0 {
+		if len(results.Messages) == 0 {
 			log.Infof("no more messages to delete for guild '%v'", channel.Name)
 			break
 		}
@@ -231,25 +240,41 @@ func (c *Client) DeleteFromGuild(me *Me, channel *Channel) error {
 	return nil
 }
 
-func (c *Client) DeleteMessages(messages *Messages, offset *int) error {
+func (c *Client) DeleteMessages(messages Messages, offset *int) error {
 	// Milliseconds to wait between deleting messages
 	// A delay which is too short will cause the server to return 429 and force us to wait a while
 	// By preempting the server's delay, we can reduce the number of requests made to the server
 	const minSleep = 200
 
-	for _, ctx := range messages.ContextMessages {
+	archived := make(map[string]bool)
+	for _, thread := range messages.Threads {
+		archived[thread.ID] = thread.Metadata.Archived || thread.Metadata.Locked
+	}
+
+	for _, ctx := range messages.Messages {
 		for _, msg := range ctx {
 			if !msg.Hit {
-				// This is a context message which may or may not be authored
-				// by the current user
+				// message is for context but may not be authored by this user
 				log.Debugf("skipping context message")
 				continue
 			}
 
-			// The message might be an action rather than text. Actions aren't deletable.
-			// An example of an action is a call request.
+			if archived[msg.ChannelID] {
+				// TODO: try to unarchive the thread
+				log.Debugf("message is in archived or locked thread %v", msg.ChannelID)
+				(*offset)++
+				continue
+			}
+
 			if msg.Type != UserMessage && msg.Type != UserReply {
+				// message is not text but could be an action for example
 				log.Debugf("found message of type %v, seeking ahead", msg.Type)
+				(*offset)++
+				continue
+			}
+
+			if c.skipPinned && msg.Pinned {
+				log.Infof("found pinned message, skipping")
 				(*offset)++
 				continue
 			}
@@ -265,12 +290,6 @@ func (c *Client) DeleteMessages(messages *Messages, offset *int) error {
 				continue
 			}
 
-			if c.skipPinned && msg.Pinned {
-				log.Infof("found pinned message, skipping")
-				(*offset)++
-				continue
-			}
-
 			log.Infof("deleting message %v from channel %v", msg.ID, msg.ChannelID)
 			if c.dryRun {
 				// Move seek index forward to simulate message deletion on server's side
@@ -281,6 +300,7 @@ func (c *Client) DeleteMessages(messages *Messages, offset *int) error {
 				}
 				time.Sleep(minSleep * time.Millisecond)
 			}
+
 			// Increment regardless of whether it's a dry run
 			c.deletedCount++
 		}

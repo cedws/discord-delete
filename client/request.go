@@ -122,7 +122,6 @@ func (c *Client) wait(res *http.Response, mult int) error {
 		return fmt.Errorf("error decoding response: %w", err)
 	}
 
-	// Multiply retry_after by the mult passed in
 	millis := time.Duration(data.RetryAfter*float32(mult)) * time.Millisecond
 	log.Infof("server asked us to sleep for %v", millis)
 	time.Sleep(millis)
@@ -130,27 +129,27 @@ func (c *Client) wait(res *http.Response, mult int) error {
 	return nil
 }
 
-func (c *Client) DeleteMessage(msg Message) error {
-	endpoint := fmt.Sprintf("/channels/%v/messages/%v", msg.ChannelID, msg.ID)
-	err := c.request("DELETE", endpoint, nil, nil)
-	return err
+func (c *Client) DeleteMessage(msg Message) (err error) {
+	endpoint := fmt.Sprintf(
+		"/channels/%v/messages/%v",
+		msg.ChannelID,
+		msg.ID,
+	)
+	err = c.request("DELETE", endpoint, nil, nil)
+	return
 }
 
-func (c *Client) Me() (*Me, error) {
-	var me Me
-	err := c.request("GET", "/users/@me", nil, &me)
-
-	return &me, err
+func (c *Client) Me() (me Me, err error) {
+	err = c.request("GET", "/users/@me", nil, &me)
+	return
 }
 
-func (c *Client) Channels() ([]Channel, error) {
-	var channels []Channel
-
-	err := c.request("GET", "/users/@me/channels", nil, &channels)
-	return channels, err
+func (c *Client) Channels() (channels []Channel, err error) {
+	err = c.request("GET", "/users/@me/channels", nil, &channels)
+	return
 }
 
-func (c *Client) ChannelMessages(channel *Channel, me *Me, offset int) (*Messages, error) {
+func (c *Client) ChannelMessages(channel Channel, me Me, offset int) (messages Messages, err error) {
 	endpoint := fmt.Sprintf(
 		"/channels/%v/messages/search",
 		channel.ID,
@@ -164,39 +163,32 @@ func (c *Client) ChannelMessages(channel *Channel, me *Me, offset int) (*Message
 		MaxID:       c.maxID,
 	}
 
-	var results Messages
-	err := c.request("GET", endpoint+args.MarshalText(), nil, &results)
-
-	return &results, err
+	err = c.request("GET", endpoint+args.MarshalText(), nil, &messages)
+	return
 }
 
-func (c *Client) ChannelRelationship(relation *Recipient) (*Channel, error) {
+func (c *Client) RelationshipChannel(relation Recipient) (channel Channel, err error) {
 	recipients := struct {
 		Recipients []string `json:"recipients"`
 	}{
 		[]string{relation.ID},
 	}
-	var channel Channel
 
-	err := c.request("POST", "/users/@me/channels", recipients, &channel)
-	return &channel, err
+	err = c.request("POST", "/users/@me/channels", recipients, &channel)
+	return
 }
 
-func (c *Client) Relationships() ([]Relationship, error) {
-	var relations []Relationship
-
-	err := c.request("GET", "/users/@me/relationships", nil, &relations)
-	return relations, err
+func (c *Client) Relationships() (relations []Relationship, err error) {
+	err = c.request("GET", "/users/@me/relationships", nil, &relations)
+	return
 }
 
-func (c *Client) Guilds() ([]Channel, error) {
-	var channels []Channel
-
-	err := c.request("GET", "/users/@me/guilds", nil, &channels)
-	return channels, err
+func (c *Client) Guilds() (channels []Channel, err error) {
+	err = c.request("GET", "/users/@me/guilds", nil, &channels)
+	return
 }
 
-func (c *Client) GuildMessages(channel *Channel, me *Me, offset int) (*Messages, error) {
+func (c *Client) GuildMessages(channel Channel, me Me, offset int) (messages Messages, err error) {
 	endpoint := fmt.Sprintf(
 		"/guilds/%v/messages/search",
 		channel.ID,
@@ -210,8 +202,6 @@ func (c *Client) GuildMessages(channel *Channel, me *Me, offset int) (*Messages,
 		MaxID:       c.maxID,
 	}
 
-	var results Messages
-
-	err := c.request("GET", endpoint+args.MarshalText(), nil, &results)
-	return &results, err
+	err = c.request("GET", endpoint+args.MarshalText(), nil, &messages)
+	return
 }
