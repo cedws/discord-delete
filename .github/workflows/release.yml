@@ -1,29 +1,65 @@
 name: Build
 
-on: 
+on:
   push:
     tags:
     - '*'
 
 jobs:
 
-  build:
+  ubuntu-build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     - name: Set up Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
         go-version: 1.18
 
-    - name: Build
-      run: make
+    - run: make build-linux
 
     - name: Publish GitHub release
       uses: ncipollo/release-action@v1
       with:
         artifacts: "bin/*"
         allowUpdates: true
-        replacesArtifacts: true
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+  macos-build:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.18
+
+    - run: make build-darwin
+
+    - name: Publish GitHub release
+      uses: ncipollo/release-action@v1
+      with:
+        artifacts: "bin/*"
+        allowUpdates: true
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+  windows-build:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.18
+
+    - run: make build-windows
+
+    - name: Publish GitHub release
+      uses: ncipollo/release-action@v1
+      with:
+        artifacts: "bin/*"
+        allowUpdates: true
         token: ${{ secrets.GITHUB_TOKEN }}
