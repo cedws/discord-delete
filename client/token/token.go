@@ -11,6 +11,11 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
+const (
+	v10Prefix   = "v10"
+	dpapiPrefix = "DPAPI"
+)
+
 var (
 	ErrorTokenRetrieve = errors.New("token: error retrieving token from database")
 	ErrorTokenPlatform = errors.New("token: retrieval not supported on this platform yet")
