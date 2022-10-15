@@ -36,7 +36,7 @@ func getSafeStorageTokens(path string) (SafeStorageTokens, error) {
 		ReadOnly: true,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("tokens: error opening database: %w", err)
+		return nil, fmt.Errorf("token: error opening database: %w", err)
 	}
 	defer db.Close()
 

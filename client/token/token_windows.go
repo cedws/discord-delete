@@ -5,6 +5,7 @@ import (
 	"crypto/cipher"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -37,8 +38,9 @@ func GetToken() (string, error) {
 
 		safeTokens, err := getSafeStorageTokens(path)
 		if err != nil {
-			// try another database
-			log.Error(err)
+			if !errors.Is(err, os.ErrNotExist) {
+				log.Error(err)
+			}
 			continue
 		}
 
