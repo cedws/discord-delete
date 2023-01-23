@@ -2,7 +2,7 @@
 A tool for deleting Discord message history.
 
 >:warning: **Any tool for deleting messages, including this one, could result in the termination of your account** (see [self-bots](https://support.discordapp.com/hc/en-us/articles/115002192352-Automated-user-accounts-self-bots-)).
->Discord appears to have recently started cracking down on self-bots.
+>Discord appears to have recently started cracking down on self-bots. You may be required to verify your account using a phone number upon using this tool.
 
 ## Features
 - Dry run mode
