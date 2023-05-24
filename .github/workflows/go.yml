@@ -1,4 +1,4 @@
-name: Build
+name: Go
 
 on:
   push:
@@ -10,36 +10,51 @@ jobs:
 
   ubuntu-build:
     runs-on: ubuntu-latest
+
     steps:
     - uses: actions/checkout@v3
 
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.18
+        go-version: '1.20'
 
-    - run: make build-linux
+    - name: Test
+      run: make test
+
+    - name: Build
+      run: make build-linux
 
   macos-build:
     runs-on: macos-latest
+
     steps:
     - uses: actions/checkout@v3
 
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.18
+        go-version: '1.20'
 
-    - run: make build-darwin
+    - name: Test
+      run: make test
+
+    - name: Build
+      run: make build-darwin
 
   windows-build:
     runs-on: windows-latest
+
     steps:
     - uses: actions/checkout@v3
 
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.18
+        go-version: '1.20'
 
-    - run: make build-windows
+    - name: Test
+      run: make test
+
+    - name: Build
+      run: make build-windows

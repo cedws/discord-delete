@@ -1,4 +1,4 @@
-name: Build
+name: Release
 
 on:
   push:
@@ -9,57 +9,66 @@ jobs:
 
   ubuntu-build:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
     steps:
     - uses: actions/checkout@v3
 
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.18
+        go-version: '1.20'
 
     - run: make build-linux
 
-    - name: Publish GitHub release
-      uses: ncipollo/release-action@v1
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
       with:
-        artifacts: "bin/*"
-        allowUpdates: true
-        token: ${{ secrets.GITHUB_TOKEN }}
+        files: bin/*
 
   macos-build:
     runs-on: macos-latest
+
+    permissions:
+      contents: write
+
     steps:
     - uses: actions/checkout@v3
 
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.18
+        go-version: '1.20'
 
     - run: make build-darwin
 
-    - name: Publish GitHub release
-      uses: ncipollo/release-action@v1
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
       with:
-        artifacts: "bin/*"
-        allowUpdates: true
-        token: ${{ secrets.GITHUB_TOKEN }}
+        files: bin/*
 
   windows-build:
     runs-on: windows-latest
+
+    permissions:
+      contents: write
+
     steps:
     - uses: actions/checkout@v3
 
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.18
+        go-version: '1.20'
 
     - run: make build-windows
 
-    - name: Publish GitHub release
-      uses: ncipollo/release-action@v1
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
       with:
-        artifacts: "bin/*"
-        allowUpdates: true
-        token: ${{ secrets.GITHUB_TOKEN }}
+        files: bin/*
